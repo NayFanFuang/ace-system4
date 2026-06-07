@@ -1,0 +1,11 @@
+{
+  "_note": "ผลที่ AI Vision อ่านได้จาก 7.Bill AIS - TF-04-2026 Item.43-5-9.pdf (5 หน้า). amount=ยอดก่อน VAT, vat=VAT 7% ตามที่พิมพ์บนบิล. ระบบจะคำนวณ WHT/Net เอง.",
+  "vendor": "Advanced Wireless Network Co., Ltd. (AIS)",
+  "lines": [
+    {"source_page": 1, "vendor": "Advanced Wireless Network Co., Ltd. (AIS)", "phone": "0632297691", "period": "01/03/2026-31/03/2026", "amount": 2299.00, "vat": 160.93},
+    {"source_page": 2, "vendor": "Advanced Wireless Network Co., Ltd. (AIS)", "phone": "0632684972", "period": "01/03/2026-31/03/2026", "amount": 299.00, "vat": 20.93},
+    {"source_page": 3, "vendor": "Advanced Wireless Network Co., Ltd. (AIS)", "phone": "0632713230", "period": "01/03/2026-31/03/2026", "amount": 299.00, "vat": 20.93},
+    {"source_page": 4, "vendor": "Advanced Wireless Network Co., Ltd. (AIS)", "phone": "0632687670", "period": "01/03/2026-31/03/2026", "amount": 2299.00, "vat": 160.93},
+    {"source_page": 5, "vendor": "Advanced Wireless Network Co., Ltd. (AIS)", "phone": "0657321679", "period": "01/03/2026-31/03/2026", "amount": 2299.00, "vat": 160.93}
+  ]
+}

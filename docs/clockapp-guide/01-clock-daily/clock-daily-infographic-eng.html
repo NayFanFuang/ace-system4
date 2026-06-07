@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACE ClockApp - Clock In/Out DAILY</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #e9eef5;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: #0f172a;
+    }
+    .poster {
+      width: 1240px;
+      height: 1754px;
+      margin: 0 auto;
+      background:
+        radial-gradient(circle at 6% 8%, rgba(36,71,216,.16), transparent 28%),
+        radial-gradient(circle at 92% 4%, rgba(191,48,64,.16), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+      padding: 40px 54px 44px;
+      overflow: hidden;
+    }
+    .hero {
+      display: block;
+      border-radius: 28px;
+      padding: 30px 38px;
+      color: #fff;
+      background: linear-gradient(135deg, #2447d8 0%, #70328d 48%, #c0392b 100%);
+      box-shadow: 0 22px 60px rgba(36, 71, 216, .22);
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      font-weight: 800;
+      font-size: 19px;
+    }
+    h1 {
+      margin: 18px 0 10px;
+      font-size: 48px;
+      line-height: 1.05;
+      letter-spacing: -1px;
+    }
+    .subtitle {
+      font-size: 23px;
+      line-height: 1.45;
+      color: rgba(255,255,255,.9);
+      font-weight: 650;
+    }
+    .section-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin: 30px 4px 18px;
+    }
+    .section-title h2 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: -.4px;
+    }
+    .section-title p {
+      margin: 0;
+      color: #64748b;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .card {
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 18px 46px rgba(15,23,42,.09);
+      overflow: hidden;
+      min-height: 498px;
+      position: relative;
+    }
+    .card-head {
+      padding: 18px 20px 14px;
+      min-height: 150px;
+      border-bottom: 1px solid #edf1f7;
+    }
+    .step {
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      background: #2447d8;
+      color: white;
+      font-size: 23px;
+      font-weight: 950;
+      margin-bottom: 10px;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 23px;
+      line-height: 1.15;
+    }
+    .card p {
+      margin: 0;
+      color: #64748b;
+      font-size: 15.5px;
+      line-height: 1.38;
+      font-weight: 650;
+    }
+    .phone-wrap {
+      height: 348px;
+      display: flex;
+      align-items: start;
+      justify-content: center;
+      padding: 14px;
+      background: linear-gradient(180deg, #f8fafc, #eef2f7);
+    }
+    .phone {
+      width: 158px;
+      height: 342px;
+      border-radius: 22px;
+      object-fit: cover;
+      object-position: top center;
+      box-shadow: 0 16px 36px rgba(15,23,42,.24);
+      border: 6px solid #111827;
+      background: #111827;
+    }
+    .phone.login { object-position: top center; }
+    .note-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 22px;
+    }
+    .note {
+      border-radius: 22px;
+      padding: 22px 26px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 40px rgba(15,23,42,.07);
+    }
+    .note h3 {
+      margin: 0 0 14px;
+      font-size: 26px;
+    }
+    .note ul {
+      margin: 0;
+      padding-left: 24px;
+      color: #334155;
+      font-size: 19px;
+      line-height: 1.46;
+      font-weight: 650;
+    }
+    .tips {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .tip {
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      font-size: 16.5px;
+      line-height: 1.45;
+      font-weight: 700;
+      color: #475569;
+    }
+    .tip strong { display: block; color: #0f172a; font-size: 20px; margin-bottom: 4px; }
+    .contact-band {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 1fr 190px;
+      gap: 18px;
+      align-items: center;
+      border-radius: 22px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 40px rgba(15,23,42,.07);
+      padding: 18px 24px;
+    }
+    .contact-band h3 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+    .contact-band p {
+      margin: 0;
+      color: #475569;
+      font-size: 17px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+    .contact-meta {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #2447d8;
+      padding: 7px 12px;
+      font-size: 14.5px;
+      font-weight: 900;
+    }
+    .qr-box {
+      justify-self: end;
+      text-align: center;
+    }
+    .qr-box img {
+      width: 132px;
+      height: 132px;
+      border-radius: 16px;
+      border: 8px solid #f8fafc;
+      box-shadow: 0 10px 24px rgba(15,23,42,.12);
+      background: #fff;
+    }
+    .qr-box div {
+      margin-top: 8px;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .footer {
+      margin-top: 22px;
+      padding: 22px 30px;
+      border-radius: 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #111827;
+      color: #e5e7eb;
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .badge {
+      color: #fff;
+      background: #16a34a;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 18px;
+      font-weight: 900;
+    }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <section class="hero">
+      <div>
+        <div class="kicker">ACE ClockApp User Guide</div>
+        <h1>Clock In / Clock Out DAILY</h1>
+        <div class="subtitle">
+          For DAILY employees such as DTA, TE, and Office Staff.
+          Record daily attendance on mobile with GPS and selfie verification.
+        </div>
+      </div>
+    </section>
+
+    <section class="flow">
+      <article class="card">
+        <div class="card-head">
+          <div class="step">1</div>
+          <h3>Log In</h3>
+          <p>Enter your email or employee code and password, then tap Login.</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone login" src="00-login.png" alt="ClockApp login screen">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">2</div>
+          <h3>Check GPS and Clock In</h3>
+          <p>Stay within the allowed area, wait for GPS to show In range, then tap Clock In.</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone" src="01-dashboard-ready.png" alt="Clock dashboard ready screen">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">3</div>
+          <h3>Take Selfie Verification</h3>
+          <p>Place your face inside the frame, take the photo, and confirm to save the time record.</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone" src="02-selfie-verification.png" alt="Selfie verification screen">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">4</div>
+          <h3>Clock Out and Check History</h3>
+          <p>At the end of work, tap Clock Out, take the confirmation photo, then review or export from History.</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone" src="03-history.png" alt="Clock history screen">
+        </div>
+      </article>
+    </section>
+
+    <section class="note-grid">
+      <div class="note">
+        <h3>Daily Workflow</h3>
+        <ul>
+          <li>Open ClockApp on your mobile phone.</li>
+          <li>Log in with your employee account.</li>
+          <li>Allow Location and Camera permissions.</li>
+          <li>Tap Clock In when starting work.</li>
+          <li>Tap Clock Out when finishing work.</li>
+          <li>Check Total Hours and History.</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>Important Notes</h3>
+        <ul>
+          <li>GPS must be enabled and you must be within the allowed radius.</li>
+          <li>The selfie photo is saved with each clock-in and clock-out record.</li>
+          <li>If GPS does not appear, wait for signal or re-enable Location permission.</li>
+          <li>If you forget to Clock Out, contact your supervisor or Admin for review.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="tips">
+      <div class="tip"><strong>Clock In</strong>Use when starting work. The system records time, GPS location, and verification photo.</div>
+      <div class="tip"><strong>Clock Out</strong>Use when finishing work. Total working hours are calculated in Today’s Summary.</div>
+      <div class="tip"><strong>History</strong>Review past records, search, and export CSV when evidence is required.</div>
+    </section>
+
+    <section class="contact-band">
+      <div>
+        <h3>Scan to Open ClockApp</h3>
+        <p>Open on mobile for full GPS and camera functionality.</p>
+        <div class="contact-meta">
+          <span class="pill">Designed / Contact: Peerapol Pianmsri</span>
+          <span class="pill">Link: ace.airconnect-e.com/ClockApp</span>
+          <span class="pill">Updated: 2026-06-01</span>
+        </div>
+      </div>
+      <div class="qr-box">
+        <img src="clockapp-qr.png" alt="QR Code for ACE ClockApp">
+        <div>Scan QR</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Airconnect Engineering (Thailand) Co., Ltd. | ACE Clock System 2.0</span>
+      <span class="badge">Daily Clock Guide</span>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "ace-clock-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@vitejs/plugin-react": "latest",
+    "html2canvas": "latest",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
+    "lucide-react": "^1.14.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "^4.2.4",
+    "vite": "latest",
+    "xlsx-js-style": "^1.2.0"
+  }
+}

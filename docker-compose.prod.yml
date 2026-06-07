@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ace-system-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ace_system}
+      POSTGRES_USER: ${POSTGRES_USER:-ace_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ace_password}
+    volumes:
+      - ace_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ace_user} -d ${POSTGRES_DB:-ace_system}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ace-system-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ace_user:ace_password@postgres:5432/ace_system}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set to a strong random secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-8}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8081}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8081}
+      SMTP_PROVIDER: ${SMTP_PROVIDER:-ACE Mail}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TLS: ${SMTP_TLS:-false}
+    volumes:
+      - ./photos:/app/photos
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: ace-system-frontend
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+
+volumes:
+  ace_postgres_data:

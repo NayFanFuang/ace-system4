@@ -1,0 +1,726 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #f5f7fb;
+  color: #111827;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.ace-ui-kit-scale {
+  zoom: .9;
+}
+
+@supports not (zoom: 1) {
+  .ace-ui-kit-scale {
+    width: 111.111%;
+    min-height: 111.111vh;
+    transform: scale(.9);
+    transform-origin: top left;
+  }
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.ace-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #ebe7e2 0%, #c9dbe6 100%);
+}
+
+.ace-login-card {
+  width: min(100%, 430px);
+  overflow: hidden;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(16, 24, 40, .18);
+}
+
+.ace-login-hero {
+  padding: 28px;
+  color: #fff;
+  background: linear-gradient(135deg, #2447d8 0%, #c73b32 100%);
+}
+
+.ace-login-brand {
+  font-size: 1.75rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.ace-login-subtitle {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, .84);
+  font-size: .88rem;
+  font-weight: 650;
+}
+
+.ace-login-form {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+}
+
+.ace-login-form label {
+  color: #344054;
+  font-size: .82rem;
+  font-weight: 850;
+}
+
+.ace-login-form input {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 12px 14px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  outline: none;
+  color: #1d2939;
+  background: #fff;
+}
+
+.ace-login-form input:focus {
+  border-color: #2447d8;
+  box-shadow: 0 0 0 3px rgba(36, 71, 216, .12);
+}
+
+.ace-login-form button {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  background: linear-gradient(135deg, #2447d8 0%, #c73b32 100%);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ace-login-error {
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #b42318;
+  background: #fee4e2;
+  font-size: .82rem;
+  font-weight: 750;
+}
+
+.ace-login-help {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #edf0f5;
+  border-radius: 6px;
+  color: #667085;
+  background: #f8fafc;
+  font-size: .78rem;
+  line-height: 1.7;
+}
+
+@keyframes ace-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ace-slide-up {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes ace-rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: .4;
+    transform: scale(.7);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .4;
+  }
+}
+
+.ace-clock-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #e7edf5 0%, #c8d9e6 100%);
+}
+
+.ace-phone-shell {
+  position: relative;
+  display: flex;
+  width: min(430px, 100vw);
+  height: min(900px, calc(100dvh - 48px));
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #f0f2f5;
+  box-shadow: 0 26px 80px rgba(15, 23, 42, .26);
+}
+
+.ace-clock-header {
+  background: linear-gradient(135deg, #3a1c71 0%, #d76d77 60%, #c0392b 100%);
+}
+
+.ace-clock-title {
+  letter-spacing: 0;
+}
+
+.ace-clock-date {
+  letter-spacing: .01em;
+}
+
+.ace-clock-tabs {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+}
+
+.ace-clock-tab-active {
+  margin: 6px 4px;
+  padding: 8px 18px;
+  border-bottom: 3px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, #3a1c71, #c0392b);
+  font-weight: 700;
+}
+
+.ace-clock-tab-idle {
+  margin-bottom: -1px;
+  padding: 14px 20px;
+  border-bottom: 3px solid transparent;
+  color: #888;
+  background: none;
+}
+
+.ace-clock-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ace-clock-main-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 100px;
+}
+
+.ace-clock-card {
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .07);
+}
+
+.ace-clock-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: #eef2f7;
+}
+
+.ace-clock-login-card {
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, .14);
+}
+
+.ace-clock-login-hero {
+  padding: 28px 28px 24px;
+  color: #fff;
+  background: linear-gradient(135deg, #1d4ed8 0%, #b91c1c 100%);
+}
+
+.ace-clock-login-heading {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.ace-clock-login-subtitle {
+  margin-top: 6px;
+  font-size: 14px;
+  opacity: .82;
+}
+
+.ace-clock-login-form {
+  padding: 24px;
+}
+
+.ace-clock-muted-button {
+  border-color: #e2e8f0;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.ace-clock-logout-button {
+  border-color: #e2e8f0;
+  color: #475569;
+  background: #f8fafc;
+}
+
+.ace-clock-loading-backdrop {
+  background: rgba(240, 242, 245, .88);
+  backdrop-filter: blur(4px);
+}
+
+.ace-clock-loading-panel {
+  padding: 28px 36px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .12);
+}
+
+.ace-clock-spinner {
+  border: 3px solid #eee;
+  border-top-color: #2c4fd4;
+  animation: ace-spin .8s linear infinite;
+}
+
+.ace-clock-modal-backdrop {
+  background: rgba(0, 0, 0, .45);
+  backdrop-filter: blur(4px);
+}
+
+.ace-clock-modal-sheet {
+  padding: 24px 22px 20px;
+  border-radius: 20px 20px 16px 16px;
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, .12);
+  animation: ace-slide-up .22s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+.ace-clock-ok-button {
+  background: linear-gradient(135deg, #4a6de5, #2c4fd4);
+}
+
+.ace-clock-footer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  width: 100%;
+  padding: 12px 20px;
+  text-align: center;
+  background: linear-gradient(135deg, #2c2c54 0%, #c0392b 100%);
+}
+
+.ace-clock-footer-company {
+  color: rgba(255, 255, 255, .9);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.ace-clock-footer-version {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, .55);
+  font-size: .68rem;
+  letter-spacing: .04em;
+}
+
+@media (max-width: 520px) {
+  .ace-clock-page {
+    display: block;
+    padding: 0;
+    background: #f0f2f5;
+  }
+
+  .ace-phone-shell {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .ace-overview-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.ace-kpi-page table th {
+  padding: 12px;
+  border-bottom: 1px solid #d8dee8;
+  background: #f8fafc;
+  color: #344054;
+  text-align: left;
+  font-size: .76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.ace-kpi-page table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf0f5;
+  vertical-align: middle;
+}
+
+.ace-kpi-page table tbody tr:hover td {
+  background: #fbfcff;
+}
+
+.ace-kpi-page button {
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.ace-kpi-page button:hover {
+  transform: translateY(-1px);
+}
+
+.ace-kpi-page input:focus,
+.ace-kpi-page select:focus {
+  border-color: #2447d8 !important;
+  box-shadow: 0 0 0 3px rgba(36, 71, 216, .12);
+}
+
+.ace-clock-monitor-page table th {
+  padding: 12px;
+  border-bottom: 1px solid #d8dee8;
+  background: #f8fafc;
+  color: #344054;
+  text-align: left;
+  font-size: .75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.ace-clock-monitor-page table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf0f5;
+  vertical-align: middle;
+}
+
+.ace-clock-monitor-page table tbody tr:hover td {
+  background: #fbfcff;
+}
+
+.ace-clock-monitor-page input:focus,
+.ace-clock-monitor-page select:focus {
+  border-color: #2447d8 !important;
+  box-shadow: 0 0 0 3px rgba(36, 71, 216, .12);
+}
+
+.ace-clock-monitor-page button {
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.ace-clock-monitor-page button:hover {
+  transform: translateY(-1px);
+}
+
+.ace-revenue-expense-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+
+.ace-revenue-expense-page table th {
+  padding: 12px;
+  border-bottom: 1px solid #d8dee8;
+  background: #f8fafc;
+  color: #344054;
+  text-align: left;
+  font-size: .74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.ace-revenue-expense-page table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf0f5;
+  color: #1d2939;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ace-revenue-expense-page table tbody tr:hover td {
+  background: #fbfcff;
+}
+
+.ace-revenue-expense-page input,
+.ace-revenue-expense-page select {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  outline: none;
+  color: #1d2939;
+  background: #fff;
+}
+
+.ace-revenue-expense-page input:focus,
+.ace-revenue-expense-page select:focus {
+  border-color: #2447d8 !important;
+  box-shadow: 0 0 0 3px rgba(36, 71, 216, .12);
+}
+
+.ace-revenue-expense-page button {
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.ace-revenue-expense-page button:hover {
+  transform: translateY(-1px);
+}
+
+.ace-po-system-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+
+.ace-po-system-page table th {
+  padding: 12px;
+  border-bottom: 1px solid #d8dee8;
+  background: #f8fafc;
+  color: #344054;
+  text-align: left;
+  font-size: .74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.ace-po-system-page table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf0f5;
+  color: #1d2939;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ace-po-system-page table tbody tr:hover td {
+  background: #fbfcff;
+}
+
+.ace-po-system-page input:focus {
+  border-color: #2447d8 !important;
+  box-shadow: 0 0 0 3px rgba(36, 71, 216, .12);
+}
+
+.ace-po-system-page button {
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.ace-po-system-page button:hover {
+  transform: translateY(-1px);
+}
+
+.ace-project-monitor-page table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #1d2939;
+}
+
+.ace-project-monitor-page table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 9px 10px;
+  border-bottom: 1px solid #d8dee8;
+  background: #f8fafc;
+  color: #344054;
+  text-align: left;
+  font-size: .68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.ace-project-monitor-page table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #edf0f5;
+  color: #1d2939;
+  font-size: .74rem;
+  line-height: 1.35;
+  vertical-align: top;
+}
+
+.ace-project-monitor-page table tbody tr:nth-child(even) td {
+  background: #fbfcff;
+}
+
+.ace-project-monitor-page table tbody tr:hover td {
+  background: #eef3ff;
+}
+
+.ace-project-monitor-page table th:nth-child(1),
+.ace-project-monitor-page table td:nth-child(1) {
+  width: 180px;
+}
+
+.ace-project-monitor-page table th:nth-child(2),
+.ace-project-monitor-page table td:nth-child(2) {
+  width: 78px;
+}
+
+.ace-project-monitor-page table th:nth-child(3),
+.ace-project-monitor-page table td:nth-child(3) {
+  width: 120px;
+}
+
+.ace-project-monitor-page table th:nth-child(4),
+.ace-project-monitor-page table td:nth-child(4) {
+  width: 110px;
+}
+
+.ace-project-monitor-page table th:nth-child(5),
+.ace-project-monitor-page table td:nth-child(5) {
+  width: 120px;
+}
+
+.ace-project-monitor-page table th {
+  overflow: visible;
+}
+
+.ace-project-monitor-page .project-monitor-ssv-table th:nth-child(1),
+.ace-project-monitor-page .project-monitor-ssv-table td:nth-child(1) {
+  width: 92px;
+}
+
+.ace-project-monitor-page .project-monitor-ssv-table th:nth-child(2),
+.ace-project-monitor-page .project-monitor-ssv-table td:nth-child(2) {
+  width: 230px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ace-project-monitor-page .project-monitor-ssv-table th:nth-child(3),
+.ace-project-monitor-page .project-monitor-ssv-table td:nth-child(3),
+.ace-project-monitor-page .project-monitor-ssv-table th:nth-child(4),
+.ace-project-monitor-page .project-monitor-ssv-table td:nth-child(4) {
+  width: 112px;
+  white-space: nowrap;
+}
+
+.ace-project-monitor-page .project-monitor-ssv-table th:nth-child(5),
+.ace-project-monitor-page .project-monitor-ssv-table td:nth-child(5) {
+  width: 112px;
+}
+
+.ace-project-monitor-page .project-monitor-ssv-table th:nth-child(6),
+.ace-project-monitor-page .project-monitor-ssv-table td:nth-child(6) {
+  width: 100px;
+}
+
+.ace-project-monitor-page .project-monitor-pac-table th:nth-child(1),
+.ace-project-monitor-page .project-monitor-pac-table td:nth-child(1) {
+  width: 180px;
+}
+
+.ace-project-monitor-page .project-monitor-pac-table th:nth-child(2),
+.ace-project-monitor-page .project-monitor-pac-table td:nth-child(2) {
+  width: 78px;
+}
+
+.ace-project-monitor-page table th:last-child,
+.ace-project-monitor-page table td:last-child {
+  min-width: 420px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ace-project-monitor-page input:focus,
+.ace-project-monitor-page select:focus {
+  border-color: #2447d8 !important;
+  box-shadow: 0 0 0 3px rgba(36, 71, 216, .12);
+}
+
+@media (max-width: 1180px) {
+  .ace-po-system-page {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ace-po-system-page aside {
+    position: static !important;
+    height: auto !important;
+  }
+
+  .ace-po-system-page main {
+    padding: 18px !important;
+  }
+
+  .ace-po-system-page [style*="grid-template-columns: repeat(4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .ace-po-system-page [style*="grid-template-columns: minmax(260px"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .ace-po-system-page header {
+    flex-direction: column !important;
+  }
+
+  .ace-po-system-page [style*="grid-template-columns: repeat(4"],
+  .ace-po-system-page [style*="grid-template-columns: minmax(260px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ace-po-system-page input {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .ace-kpi-page {
+    padding: 18px !important;
+  }
+
+  .ace-kpi-page [style*="grid-template-columns: 1.2fr 1.3fr 1fr .9fr auto"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+}
+
+/* Work-Locations map: drop-target highlight on zone markers.
+   Leaflet sets translate3d() on the marker wrapper for positioning,
+   so we highlight the INNER divIcon HTML instead of scaling the wrapper
+   (avoids cumulative transform appends that ballooned the marker). */
+.wl-marker.wl-drop-hover > div {
+  outline: 3px solid #2447d8;
+  outline-offset: 2px;
+  box-shadow: 0 6px 24px rgba(36, 71, 216, .55);
+}

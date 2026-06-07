@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACE Leave Policy & Workflow</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9eef5; font-family: "Segoe UI", Tahoma, sans-serif; color: #0f172a; }
+    .poster {
+      width: 1240px;
+      height: 1754px;
+      margin: 0 auto;
+      overflow: hidden;
+      padding: 38px 54px 34px;
+      background:
+        radial-gradient(circle at 7% 8%, rgba(36,71,216,.16), transparent 28%),
+        radial-gradient(circle at 92% 4%, rgba(191,48,64,.16), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    }
+    .hero {
+      position: relative;
+      border-radius: 28px;
+      padding: 28px 38px;
+      color: #fff;
+      background: linear-gradient(135deg, #2447d8 0%, #70328d 48%, #c0392b 100%);
+      box-shadow: 0 22px 60px rgba(36,71,216,.22);
+    }
+    .kicker {
+      display: inline-flex;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      font-size: 19px;
+      font-weight: 850;
+    }
+    h1 { margin: 16px 0 8px; font-size: 49px; line-height: 1.05; letter-spacing: -1px; }
+    .subtitle { max-width: 760px; font-size: 23px; line-height: 1.45; color: rgba(255,255,255,.9); font-weight: 650; }
+    .hero-note {
+      position: absolute;
+      right: 34px;
+      top: 30px;
+      width: 260px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.26);
+      padding: 18px;
+    }
+    .hero-note b { display: block; font-size: 22px; margin-bottom: 8px; }
+    .hero-note span { display: block; font-size: 15px; line-height: 1.35; color: rgba(255,255,255,.86); font-weight: 720; }
+    .section-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin: 26px 4px 14px;
+    }
+    .section-title h2 { margin: 0; font-size: 31px; letter-spacing: -.4px; }
+    .section-title p { margin: 0; color: #64748b; font-size: 17px; font-weight: 750; }
+    .type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .type-card {
+      min-height: 238px;
+      border-radius: 22px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 38px rgba(15,23,42,.08);
+      padding: 17px 18px;
+    }
+    .type-card h3 { margin: 0 0 9px; font-size: 22px; }
+    .days {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #2447d8;
+      padding: 7px 11px;
+      font-size: 14px;
+      font-weight: 950;
+      margin-bottom: 10px;
+    }
+    .type-card ul { margin: 0; padding-left: 20px; color: #334155; font-size: 15.5px; line-height: 1.42; font-weight: 700; }
+    .workflow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .panel {
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 18px 46px rgba(15,23,42,.09);
+      padding: 20px 22px;
+    }
+    .panel h3 { margin: 0 0 14px; font-size: 25px; }
+    .lane { display: grid; gap: 11px; }
+    .flow-line {
+      display: grid;
+      grid-template-columns: 102px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 18px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+    .leave-label {
+      border-radius: 14px;
+      background: #eef2ff;
+      color: #2447d8;
+      padding: 10px;
+      text-align: center;
+      font-size: 12.5px;
+      line-height: 1.2;
+      font-weight: 950;
+    }
+    .steps { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .box {
+      min-width: 61px;
+      border-radius: 13px;
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 10.5px;
+      line-height: 1.14;
+      font-weight: 950;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #334155;
+    }
+    .submit { background: #eef2ff; color: #2447d8; border-color: #c7d2fe; }
+    .approve { background: #ecfdf5; color: #166534; border-color: #86efac; }
+    .current { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+    .ack { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+    .arrow { color: #94a3b8; font-weight: 950; }
+    .email-board {
+      display: grid;
+      grid-template-columns: 1.02fr .98fr;
+      gap: 14px;
+    }
+    .email-card {
+      border-radius: 18px;
+      border: 1px dashed #cbd5e1;
+      background: #f8fafc;
+      padding: 15px;
+    }
+    .email-card b { display: block; font-size: 18px; margin-bottom: 7px; }
+    .email-card p { margin: 0; color: #475569; font-size: 15px; line-height: 1.36; font-weight: 700; }
+    .status-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 18px; }
+    .status {
+      min-height: 98px;
+      border-radius: 18px;
+      padding: 12px;
+      text-align: center;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 12px 30px rgba(15,23,42,.06);
+    }
+    .dot { width: 22px; height: 22px; border-radius: 999px; margin: 0 auto 8px; }
+    .yellow { background: #f59e0b; }
+    .orange { background: #ea8a00; }
+    .blue { background: #2447d8; }
+    .green { background: #16a34a; }
+    .red { background: #dc2626; }
+    .gray { background: #6b7280; }
+    .status b { display: block; font-size: 14.5px; line-height: 1.18; }
+    .status span { display: block; margin-top: 4px; color: #64748b; font-size: 12px; line-height: 1.25; font-weight: 700; }
+    .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .note ul { margin: 0; padding-left: 23px; color: #334155; font-size: 17px; line-height: 1.42; font-weight: 690; }
+    .contact-band {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 165px;
+      gap: 18px;
+      align-items: center;
+      border-radius: 22px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 40px rgba(15,23,42,.07);
+      padding: 18px 24px;
+    }
+    .contact-band h3 { margin: 0 0 8px; font-size: 24px; }
+    .contact-band p { margin: 0; color: #475569; font-size: 17px; line-height: 1.42; font-weight: 720; }
+    .pill-row { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .pill { border-radius: 999px; background: #eef2ff; color: #2447d8; padding: 7px 12px; font-size: 14px; font-weight: 900; }
+    .qr { justify-self: end; width: 130px; height: 130px; border-radius: 16px; border: 8px solid #fff; box-shadow: 0 12px 26px rgba(15,23,42,.16); background: #fff; }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <section class="hero">
+      <div class="kicker">ACE SYSTEM | Leave Policy</div>
+      <h1>หลักการลาและ Workflow ทั้งหมด</h1>
+      <div class="subtitle">ภาพรวมประเภทการลา กฎการยื่น สถานะการอนุมัติ เส้นทางอีเมล และบทบาทของ Employee, PM, PD/Head, HR และ Boss</div>
+      <div class="hero-note"><b>ใช้คู่กับ Leave Request</b><span>หน้านี้อธิบายหลักการและ Workflow หลังจากพนักงานกด Submit Leave Request</span></div>
+    </section>
+
+    <div class="section-title">
+      <h2>ประเภทการลาและหลักการ</h2>
+      <p>อ้างอิงกฎใน ClockApp / Leave</p>
+    </div>
+    <section class="type-grid">
+      <div class="type-card">
+        <h3>Sick Leave</h3>
+        <div class="days">สิทธิเริ่มต้น 30 วัน/ปี</div>
+        <ul><li>ส่งไป HR โดยตรง</li><li>HR กด Acknowledge แล้ว Approved</li><li>ลาป่วยเกิน 2 วัน ต้องมีเอกสารประกอบ</li></ul>
+      </div>
+      <div class="type-card">
+        <h3>Personal Leave</h3>
+        <div class="days">สิทธิเริ่มต้น 3 วัน/ปี</div>
+        <ul><li>ต้องยื่นล่วงหน้าอย่างน้อย 1 วัน</li><li>PM อนุมัติแล้ว Approved</li><li>ระบบส่งสรุปให้ HR + Boss</li></ul>
+      </div>
+      <div class="type-card">
+        <h3>Annual Leave</h3>
+        <div class="days">สิทธิเริ่มต้น 6 วัน/ปี</div>
+        <ul><li>ต้องยื่นล่วงหน้าอย่างน้อย 3 วัน</li><li>ผ่าน PM แล้วต่อ PD / Head</li><li>อนุมัติแล้วแจ้ง HR + Boss</li></ul>
+      </div>
+      <div class="type-card">
+        <h3>Other Leave</h3>
+        <div class="days">ตาม Policy</div>
+        <ul><li>ใช้เมื่อไม่เข้า Sick/Personal/Annual</li><li>ผ่าน PM แล้วต่อ PD / Head</li><li>ตรวจตามเหตุผลและเอกสารประกอบ</li></ul>
+      </div>
+    </section>
+
+    <section class="workflow-grid">
+      <div class="panel">
+        <h3>Workflow การอนุมัติ</h3>
+        <div class="lane">
+          <div class="flow-line">
+            <div class="leave-label">Sick Leave</div>
+            <div class="steps"><span class="box submit">Submit</span><span class="arrow">→</span><span class="box current">HR Ack</span><span class="arrow">→</span><span class="box approve">Approved</span></div>
+          </div>
+          <div class="flow-line">
+            <div class="leave-label">Personal Leave</div>
+            <div class="steps"><span class="box submit">Submit</span><span class="arrow">→</span><span class="box current">PM</span><span class="arrow">→</span><span class="box approve">Approved</span><span class="arrow">→</span><span class="box ack">HR + Boss</span></div>
+          </div>
+          <div class="flow-line">
+            <div class="leave-label">Annual Leave</div>
+            <div class="steps"><span class="box submit">Submit</span><span class="arrow">→</span><span class="box current">PM</span><span class="arrow">→</span><span class="box current">PD / Head</span><span class="arrow">→</span><span class="box approve">Approved</span><span class="arrow">→</span><span class="box ack">HR + Boss</span></div>
+          </div>
+          <div class="flow-line">
+            <div class="leave-label">Other Leave</div>
+            <div class="steps"><span class="box submit">Submit</span><span class="arrow">→</span><span class="box current">PM</span><span class="arrow">→</span><span class="box current">PD / Head</span><span class="arrow">→</span><span class="box approve">Approved</span><span class="arrow">→</span><span class="box ack">HR + Boss</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Automatic Email / Notification</h3>
+        <div class="email-board">
+          <div class="email-card"><b>เมื่อ Submit</b><p>Sick ส่งให้ HR, ส่วน Personal / Annual / Other ส่งให้ PM พร้อม CC ผู้เกี่ยวข้องตามสายงาน</p></div>
+          <div class="email-card"><b>เมื่อ PM Approve</b><p>Personal จะ Approved และแจ้ง HR + Boss ส่วน Annual / Other จะส่งต่อให้ PD / Head</p></div>
+          <div class="email-card"><b>เมื่อ PD / Head Approve</b><p>Annual / Other เปลี่ยนเป็น Approved แล้วส่ง Summary Report ให้ HR + Boss รับทราบ</p></div>
+          <div class="email-card"><b>เมื่อ Reject</b><p>PM หรือ PD / Head ต้องใส่เหตุผล Reject ระบบส่งอีเมลแจ้ง HR และผู้เกี่ยวข้อง</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="status-grid">
+      <div class="status"><div class="dot yellow"></div><b>Pending PM</b><span>รอ PM อนุมัติ</span></div>
+      <div class="status"><div class="dot orange"></div><b>Pending PD</b><span>รอ PD / Head อนุมัติ</span></div>
+      <div class="status"><div class="dot blue"></div><b>Pending HR</b><span>รอ HR Acknowledge</span></div>
+      <div class="status"><div class="dot green"></div><b>Approved</b><span>อนุมัติสำเร็จ</span></div>
+      <div class="status"><div class="dot red"></div><b>Rejected</b><span>ถูกปฏิเสธพร้อมเหตุผล</span></div>
+      <div class="status"><div class="dot gray"></div><b>Cancelled</b><span>ผู้ขอยกเลิกคำขอ</span></div>
+    </section>
+
+    <section class="bottom-grid">
+      <div class="panel note">
+        <h3>ขั้นตอนของพนักงาน</h3>
+        <ul>
+          <li>เลือก Leave Type, Session, Start Date, End Date และกรอก Reason</li>
+          <li>ตรวจจำนวนวันลา สิทธิคงเหลือ และคำแนะนำก่อน Submit</li>
+          <li>แนบเอกสารเมื่อจำเป็น เช่น Sick Leave เกิน 2 วัน</li>
+          <li>ติดตามสถานะใน My Leave Requests และ Cancel ได้ระหว่าง Pending</li>
+        </ul>
+      </div>
+      <div class="panel note">
+        <h3>หลักควบคุมของระบบ</h3>
+        <ul>
+          <li>ระบบคำนวณ Full Day / Morning Half / Afternoon Half เป็นจำนวนวันลา</li>
+          <li>ตรวจวันลาซ้ำหรือชนกับ Attendance เพื่อป้องกันข้อมูลซ้อน</li>
+          <li>สิทธิลาแยกตามหมวด Sick, Personal, Annual, Other และปีปฏิทิน</li>
+          <li>การ Reject ต้องมีเหตุผลเพื่อให้ตรวจสอบย้อนหลังได้</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="contact-band">
+      <div>
+        <h3>ลิงก์เข้าใช้งานและผู้ติดต่อ</h3>
+        <p>ClockApp Leave: https://ace.airconnect-e.com/ClockApp</p>
+        <p>ผู้ออกแบบและติดต่อ: Peerapol Pianmsri</p>
+        <div class="pill-row"><span class="pill">A4 Infographic</span><span class="pill">Thai Version</span><span class="pill">Updated 2026-06-02</span></div>
+      </div>
+      <img class="qr" alt="QR Code to ClockApp" src="clockapp-qr.png" />
+    </section>
+  </main>
+</body>
+</html>

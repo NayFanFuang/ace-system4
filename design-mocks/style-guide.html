@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>ACE — Style Guide</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sarabun:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--brand:#2447d8;--accent:#c73b32;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f5f7fb}
+  html,body{font-family:"Inter","Sarabun",sans-serif;background:var(--bg);color:var(--ink)}
+  .mono{font-family:"JetBrains Mono",monospace}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+  .hero{background:linear-gradient(135deg,#2447d8 0%,#c73b32 100%)}
+  .sw{height:72px;border-radius:12px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800}
+  code,pre{font-family:"JetBrains Mono",monospace}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:18px;font-size:12.5px;line-height:1.7;overflow:auto}
+  h2{font-size:20px;font-weight:900;letter-spacing:-.01em;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .desc{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .block{margin-top:40px}
+  table{width:100%;font-size:13px;border-collapse:collapse}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+
+  /* component examples */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:#2447d8;color:#fff}.btn-primary:hover{background:#1d3bb8}
+  .btn-ghost{background:#fff;color:#0f172a;border-color:#e2e8f0}.btn-ghost:hover{background:#f1f5f9}
+  .btn-soft{background:#eef2ff;color:#2447d8}.btn-soft:hover{background:#e0e7ff}
+  .btn-success{background:#16a34a;color:#fff}
+  .btn-danger{background:#dc2626;color:#fff}
+  .field{width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;background:#fff;outline:none;font-family:inherit}
+  .field:focus{border-color:#2447d8;box-shadow:0 0 0 4px rgba(36,71,216,.12)}
+  .switch{position:relative;display:inline-block;width:42px;height:24px}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:#cbd5e1;border-radius:24px;transition:.25s;cursor:pointer}
+  .slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .switch input:checked + .slider{background:#2447d8}
+  .switch input:checked + .slider::before{transform:translateX(18px)}
+  .b-green{background:#dcfce7;color:#15803d}.b-red{background:#fee2e2;color:#b91c1c}.b-blue{background:#dbeafe;color:#1e40af}
+  .b-amber{background:#fef3c7;color:#a16207}.b-slate{background:#e2e8f0;color:#475569}
+  .dot{width:6px;height:6px;border-radius:999px;display:inline-block}
+  .tab{padding:7px 13px;border-radius:10px;font-size:13px;font-weight:700;color:#64748b;cursor:pointer;border:none;background:transparent}
+  .tab:hover{background:#f1f5f9}
+  .tab.active{background:#2447d8;color:#fff}
+  .alert{display:flex;gap:10px;padding:12px 14px;border-radius:10px;border:1px solid;font-size:13px}
+  .a-info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+  .a-ok{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}
+  .a-warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+  .a-err{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+  /* sidebar example */
+  .side-link{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13.5px;color:#475569;border-left:3px solid transparent;cursor:pointer}
+  .side-link:hover{background:#f1f5f9}
+  .side-link.active{background:linear-gradient(90deg,rgba(36,71,216,.10),transparent);border-left-color:#2447d8;color:#2447d8;font-weight:800}
+  .side-sec{padding:12px 16px 5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#94a3b8}
+  .avatar{width:32px;height:32px;border-radius:50%;background:#2447d8;color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px}
+</style>
+</head>
+<body>
+
+<header class="hero text-white">
+  <div class="max-w-[1100px] mx-auto px-6 py-10 flex items-center gap-4">
+    <img src="../frontend/public/ace-logo.png" width="56" height="56" class="rounded-xl bg-white/95 p-1.5 object-contain">
+    <div>
+      <div class="text-3xl font-black tracking-tight">ACE Style Guide</div>
+      <div class="text-sm opacity-85 mt-1">มาตรฐานสี + รูปแบบ สำหรับทุกหน้า (แบบ B — คงเมนู/layout เดิม เปลี่ยนแค่สีที่เพี้ยน)</div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1100px] mx-auto px-6 py-10">
+
+  <!-- Palette -->
+  <section>
+    <h2>🎨 Canonical Palette</h2>
+    <div class="desc">ยึดจากโลโก้จริง — สีกลางที่ทุกหน้าต้องใช้ให้ตรงกัน</div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="card p-3"><div class="sw" style="background:#2447d8"></div><div class="mt-2 font-bold text-sm">brand</div><div class="mono text-xs text-slate-500">#2447d8</div><div class="text-[11px] text-slate-400 mt-0.5">ปุ่ม/link/active</div></div>
+      <div class="card p-3"><div class="sw" style="background:#1d3bb8"></div><div class="mt-2 font-bold text-sm">brand-dark</div><div class="mono text-xs text-slate-500">#1d3bb8</div><div class="text-[11px] text-slate-400 mt-0.5">hover</div></div>
+      <div class="card p-3"><div class="sw" style="background:#eef2ff;border:1px solid #e2e8f0"></div><div class="mt-2 font-bold text-sm">brand-50</div><div class="mono text-xs text-slate-500">#eef2ff</div><div class="text-[11px] text-slate-400 mt-0.5">พื้นอ่อน/chip</div></div>
+      <div class="card p-3"><div class="sw" style="background:#c73b32"></div><div class="mt-2 font-bold text-sm">accent</div><div class="mono text-xs text-slate-500">#c73b32</div><div class="text-[11px] text-slate-400 mt-0.5">แดง brand/gradient</div></div>
+      <div class="card p-3"><div class="sw" style="background:#16a34a"></div><div class="mt-2 font-bold text-sm">success</div><div class="mono text-xs text-slate-500">#16a34a</div><div class="text-[11px] text-slate-400 mt-0.5">สำเร็จ/on-site</div></div>
+      <div class="card p-3"><div class="sw" style="background:#d97706"></div><div class="mt-2 font-bold text-sm">warning</div><div class="mono text-xs text-slate-500">#d97706</div><div class="text-[11px] text-slate-400 mt-0.5">เตือน/pending</div></div>
+      <div class="card p-3"><div class="sw" style="background:#dc2626"></div><div class="mt-2 font-bold text-sm">error</div><div class="mono text-xs text-slate-500">#dc2626</div><div class="text-[11px] text-slate-400 mt-0.5">error เท่านั้น (ห้ามแตะ)</div></div>
+      <div class="card p-3"><div class="sw" style="background:#f5f7fb;border:1px solid #e2e8f0"></div><div class="mt-2 font-bold text-sm">app-bg</div><div class="mono text-xs text-slate-500">#f5f7fb</div><div class="text-[11px] text-slate-400 mt-0.5">พื้นหลังทุกหน้า</div></div>
+    </div>
+    <div class="card p-4 mt-3 flex items-center gap-3">
+      <div class="hero h-12 w-40 rounded-lg"></div>
+      <div class="text-sm"><b>Gradient brand</b><div class="mono text-xs text-slate-500">linear-gradient(135deg, #2447d8 0%, #c73b32 100%)</div></div>
+    </div>
+  </section>
+
+  <!-- Neutral / text -->
+  <section class="block">
+    <h2>🔤 Text & Neutral</h2>
+    <div class="desc">ตัวอักษร + เทา (คงไว้ตามเดิม ไม่ normalize)</div>
+    <div class="card p-5 flex flex-wrap gap-6 items-end">
+      <div><div class="text-2xl font-black" style="color:#0f172a">ink #0f172a</div><div class="text-[11px] text-slate-400 mono">ตัวอักษรหลัก</div></div>
+      <div><div class="text-lg font-bold" style="color:#64748b">muted #64748b</div><div class="text-[11px] text-slate-400 mono">ตัวอักษรรอง</div></div>
+      <div class="flex items-center gap-1">
+        <div class="h-9 w-9 rounded" style="background:#e2e8f0"></div>
+        <div class="h-9 w-9 rounded" style="background:#cbd5e1"></div>
+        <div class="h-9 w-9 rounded" style="background:#94a3b8"></div>
+        <div class="h-9 w-9 rounded" style="background:#64748b"></div>
+        <span class="text-[11px] text-slate-400 mono ml-2">line/slate scale</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Menu / Sidebar -->
+  <section class="block">
+    <h2>🧭 แถบเมนู / Sidebar (มาตรฐาน)</h2>
+    <div class="desc">รูปแบบเมนูที่ทุกหน้าควรใช้สีให้ตรงกัน — header gradient brand, active = น้ำเงิน #2447d8 + แถบซ้าย</div>
+    <div class="grid lg:grid-cols-3 gap-4">
+      <!-- sidebar -->
+      <div class="card overflow-hidden">
+        <div class="hero text-white px-4 py-4 flex items-center gap-3">
+          <img src="../frontend/public/ace-logo.png" width="34" height="34" class="rounded-lg bg-white/95 p-1 object-contain">
+          <div><div class="text-lg font-black leading-none">ACE</div><div class="text-[10px] uppercase tracking-widest opacity-80 mt-0.5">System 4</div></div>
+        </div>
+        <div class="py-1">
+          <div class="side-sec">My Workspace</div>
+          <div class="side-link">🕐 Clock App</div>
+          <div class="side-link">📝 Daily Work Log</div>
+          <div class="side-sec">Clock</div>
+          <div class="side-link active">📍 Clock Monitor</div>
+          <div class="side-link">📺 Live Wallboard</div>
+          <div class="side-sec">Finance</div>
+          <div class="side-link">💰 Revenue & Expense</div>
+        </div>
+        <div class="px-4 py-3 border-t border-slate-100 flex items-center gap-3">
+          <span class="avatar">PP</span>
+          <div class="leading-tight"><div class="text-sm font-bold">Peerapol P.</div><div class="text-[11px] text-slate-500">SUPER_ADMIN</div></div>
+        </div>
+      </div>
+      <!-- topbar + states note -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="card p-4">
+          <div class="text-xs font-bold uppercase text-slate-500 mb-3">Topbar / Header</div>
+          <div class="rounded-xl border border-slate-200 px-4 h-14 flex items-center gap-3 bg-white/85">
+            <span class="text-xs text-slate-500">Clock</span><span class="text-slate-300">/</span><span class="text-sm font-bold">Clock Monitor</span>
+            <div class="ml-auto flex items-center gap-2">
+              <button class="btn btn-ghost text-xs">🔍 ค้นหา</button>
+              <button class="btn btn-ghost" style="padding:8px;width:34px;justify-content:center">🌙</button>
+              <span class="avatar">PP</span>
+            </div>
+          </div>
+        </div>
+        <div class="card p-4">
+          <div class="text-xs font-bold uppercase text-slate-500 mb-3">Nav states</div>
+          <div class="flex flex-wrap gap-6 text-sm">
+            <div class="w-44 border border-slate-200 rounded-lg overflow-hidden">
+              <div class="side-link active">📍 Active</div>
+              <div class="side-link">📺 Default</div>
+              <div class="side-link" style="background:#f1f5f9">📝 Hover</div>
+            </div>
+            <div class="text-xs text-slate-500 space-y-1 self-center">
+              <div>• active: น้ำเงิน <span class="mono">#2447d8</span> + แถบซ้าย + พื้นจาง</div>
+              <div>• default: เทา <span class="mono">#475569</span></div>
+              <div>• hover: พื้น <span class="mono">#f1f5f9</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Buttons -->
+  <section class="block">
+    <h2>🔘 Buttons</h2>
+    <div class="card p-5 flex flex-wrap items-center gap-3">
+      <button class="btn btn-primary">Primary</button>
+      <button class="btn btn-ghost">Ghost</button>
+      <button class="btn btn-soft">Soft</button>
+      <button class="btn btn-success">✓ Approve</button>
+      <button class="btn btn-danger">✕ Reject</button>
+      <button class="btn btn-primary">⬇ Export</button>
+      <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+        <button class="px-3 py-2 text-xs font-bold bg-slate-100">Day</button>
+        <button class="px-3 py-2 text-xs font-bold hover:bg-slate-50">Week</button>
+        <button class="px-3 py-2 text-xs font-bold hover:bg-slate-50">Month</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Form controls -->
+  <section class="block">
+    <h2>✏️ Form controls</h2>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div class="card p-5 space-y-3">
+        <div><label class="text-xs font-bold text-slate-600 block mb-1.5">ค้นหา</label><input class="field" placeholder="ค้นหาพนักงาน, โปรเจค…"></div>
+        <div><label class="text-xs font-bold text-slate-600 block mb-1.5">Project</label><select class="field"><option>HWT2304 — RF Drive Test</option><option>HWT2604 — Pre-site</option></select></div>
+      </div>
+      <div class="card p-5 space-y-4">
+        <div class="flex items-center gap-3"><label class="switch"><input type="checkbox" checked><span class="slider"></span></label><span class="text-sm">Enabled</span></div>
+        <div class="flex items-center gap-3"><label class="switch"><input type="checkbox"><span class="slider"></span></label><span class="text-sm">Require Photo</span></div>
+        <div class="flex gap-2 pt-1"><button class="tab active">Daily</button><button class="tab">Weekly</button><button class="tab">Monthly</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Badges & status -->
+  <section class="block">
+    <h2>🏷️ Badges & status</h2>
+    <div class="card p-5 flex flex-wrap gap-2">
+      <span class="chip b-green"><span class="dot" style="background:#16a34a"></span>On Site</span>
+      <span class="chip b-blue"><span class="dot" style="background:#2447d8"></span>Office</span>
+      <span class="chip b-red"><span class="dot" style="background:#dc2626"></span>Off Site</span>
+      <span class="chip b-amber"><span class="dot" style="background:#d97706"></span>Leave</span>
+      <span class="chip b-slate"><span class="dot" style="background:#94a3b8"></span>Not Yet</span>
+      <span class="chip b-blue">DTE</span><span class="chip b-blue">PM</span><span class="chip b-slate">DRAFT</span>
+    </div>
+  </section>
+
+  <!-- Cards / stat -->
+  <section class="block">
+    <h2>🃏 Stat cards</h2>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card p-5"><div class="text-xs font-bold uppercase text-slate-500">Clocked In</div><div class="text-3xl font-black mt-2" style="color:#2447d8">142</div><div class="text-xs text-emerald-600 font-bold mt-2">↑ 8 vs เมื่อวาน</div></div>
+      <div class="card p-5"><div class="text-xs font-bold uppercase text-slate-500">On Site</div><div class="text-3xl font-black mt-2" style="color:#16a34a">118</div><div class="text-xs text-slate-500 mt-2">83%</div></div>
+      <div class="card p-5"><div class="text-xs font-bold uppercase text-slate-500">Off Site</div><div class="text-3xl font-black mt-2" style="color:#c73b32">24</div><div class="text-xs text-red-600 font-bold mt-2">↑ 4</div></div>
+      <div class="card p-5"><div class="text-xs font-bold uppercase text-slate-500">Pending</div><div class="text-3xl font-black mt-2" style="color:#d97706">7</div><div class="text-xs text-slate-500 mt-2">3 sick · 4 annual</div></div>
+    </div>
+  </section>
+
+  <!-- Table -->
+  <section class="block">
+    <h2>📑 Table</h2>
+    <div class="card overflow-hidden">
+      <table>
+        <thead style="background:#f1f5f9"><tr><th>Employee</th><th>Project</th><th>Clock In</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td><b>Peerapol Piamsri</b> <span class="text-slate-400 mono text-xs">ACE056</span></td><td class="mono text-xs">HWT2304</td><td class="mono text-xs">07:48</td><td><span class="chip b-green"><span class="dot" style="background:#16a34a"></span>On Site</span></td></tr>
+          <tr><td><b>Niran Chaisri</b> <span class="text-slate-400 mono text-xs">ACE201</span></td><td class="mono text-xs">HWT2304</td><td class="mono text-xs">08:15</td><td><span class="chip b-red"><span class="dot" style="background:#dc2626"></span>Off Site</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Alerts -->
+  <section class="block">
+    <h2>💬 Alerts</h2>
+    <div class="grid sm:grid-cols-2 gap-3">
+      <div class="alert a-info">ℹ️ ระบบจะ refresh ทุก 30 วินาที</div>
+      <div class="alert a-ok">✓ บันทึก KPI เรียบร้อย</div>
+      <div class="alert a-warn">⚠ พบ 3 รายการไม่มีรูป</div>
+      <div class="alert a-err">✕ Import PO ล้มเหลว</div>
+    </div>
+  </section>
+
+  <!-- Normalize rules -->
+  <section class="block">
+    <h2>🔁 กฎ Normalize (สีเพี้ยน → สีกลาง)</h2>
+    <div class="desc">8 หน้าใช้น้ำเงินเพี้ยน — แปลงให้ตรง #2447d8</div>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div class="card p-5">
+        <div class="text-xs font-bold uppercase text-slate-500 mb-3">น้ำเงินหลัก → brand</div>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm"><span class="h-6 w-6 rounded" style="background:#1d4ed8"></span><span class="mono text-xs">#1d4ed8</span><span class="text-slate-400">→</span><span class="h-6 w-6 rounded" style="background:#2447d8"></span><span class="mono text-xs">#2447d8</span></div>
+          <div class="flex items-center gap-2 text-sm"><span class="h-6 w-6 rounded" style="background:#2563eb"></span><span class="mono text-xs">#2563eb</span><span class="text-slate-400">→</span><span class="h-6 w-6 rounded" style="background:#2447d8"></span><span class="mono text-xs">#2447d8</span></div>
+          <div class="flex items-center gap-2 text-sm"><span class="h-6 w-6 rounded" style="background:#1e40af"></span><span class="mono text-xs">#1e40af</span><span class="text-slate-400">→</span><span class="h-6 w-6 rounded" style="background:#2447d8"></span><span class="mono text-xs">#2447d8</span></div>
+          <div class="flex items-center gap-2 text-sm"><span class="h-6 w-6 rounded" style="background:#3b82f6"></span><span class="mono text-xs">#3b82f6</span><span class="text-slate-400">→</span><span class="h-6 w-6 rounded" style="background:#2447d8"></span><span class="mono text-xs">#2447d8 *</span></div>
+          <div class="text-[11px] text-slate-400 mt-1">* เฉพาะตอนเป็น accent หลัก — ถ้าเป็นสีในกราฟที่ตั้งใจให้อ่อน ให้คงไว้</div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <div class="text-xs font-bold uppercase text-slate-500 mb-3">พื้นหลังหน้า → app-bg</div>
+        <div class="flex items-center gap-2 text-sm"><span class="h-6 w-6 rounded border border-slate-200" style="background:#f8fafc"></span><span class="mono text-xs">#f8fafc</span><span class="text-slate-400">→</span><span class="h-6 w-6 rounded border border-slate-200" style="background:#f5f7fb"></span><span class="mono text-xs">#f5f7fb</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Do / Don't -->
+  <section class="block">
+    <h2>✅ ทำ / 🚫 ห้ามแตะ</h2>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div class="card p-5" style="border-color:#bbf7d0;background:#f0fdf4">
+        <div class="font-bold text-emerald-800 mb-2">✅ เปลี่ยนได้</div>
+        <ul class="text-sm text-emerald-900/80 space-y-1.5 list-disc pl-5">
+          <li>น้ำเงินหลักที่เพี้ยน → <span class="mono">#2447d8</span></li>
+          <li>พื้นหลังหน้า → <span class="mono">#f5f7fb</span></li>
+          <li>ปุ่ม/link/active ที่ใช้สีน้ำเงินผิดเฉด</li>
+        </ul>
+      </div>
+      <div class="card p-5" style="border-color:#fecaca;background:#fef2f2">
+        <div class="font-bold text-red-800 mb-2">🚫 ห้ามแตะ</div>
+        <ul class="text-sm text-red-900/80 space-y-1.5 list-disc pl-5">
+          <li>เมนู / sidebar / header / layout / โครงสร้าง</li>
+          <li>ฟังก์ชัน / state / API / ตรรกะ</li>
+          <li>error red <span class="mono">#dc2626</span> และเฉดแดง error</li>
+          <li>gray scale (<span class="mono">slate-*</span>, <span class="mono">#64748b</span> ฯลฯ)</li>
+          <li>สีในกราฟที่เป็นชุด categorical</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Prompt -->
+  <section class="block">
+    <h2>📋 PROMPT (copy ไปใช้)</h2>
+    <div class="desc">วางในแชต แล้วแทน &lt;ชื่อไฟล์&gt; — สั่งผมหรือ agent อื่นก็ได้ผลเหมือนกัน</div>
+    <pre>normalize สีของไฟล์ &lt;ชื่อไฟล์&gt;.jsx ตาม design-mocks/STYLE_PROMPT.md:
+- น้ำเงินหลักที่เพี้ยน (#1d4ed8, #2563eb, #1e40af, #3b82f6 เมื่อเป็น accent หลัก) → #2447d8
+- พื้นหลังหน้า #f8fafc → #f5f7fb
+- ห้ามแตะ: เมนู/layout/โครงสร้าง, ฟังก์ชัน, error red #dc2626, gray scale, สีในกราฟ
+- verify ว่า curl ได้ 200 แล้วรายงานว่าเปลี่ยนกี่จุด</pre>
+  </section>
+
+  <!-- Status -->
+  <section class="block">
+    <h2>📊 สถานะหน้า</h2>
+    <div class="card overflow-hidden">
+      <table>
+        <thead><tr><th>หน้า</th><th>ไฟล์</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td>Revenue & Expense</td><td class="mono text-xs">RevenueExpensePage.jsx</td><td><span class="chip" style="background:#dcfce7;color:#15803d">✓ done</span></td></tr>
+          <tr><td>Clock Monitor</td><td class="mono text-xs">ClockMonitorPage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>HR Employees</td><td class="mono text-xs">HREmployeePage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>Project Management</td><td class="mono text-xs">ProjectPage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>RF Monitor</td><td class="mono text-xs">RFMonitorPage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>Pre-Site Monitor</td><td class="mono text-xs">PreSiteMonitorPage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>PO Import</td><td class="mono text-xs">HWPOImportPage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>Leave Approval</td><td class="mono text-xs">LeaveApprovalPage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>Clock App</td><td class="mono text-xs">ClockApp.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>KPI</td><td class="mono text-xs">KPIPage.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+          <tr><td>Executive Dashboard</td><td class="mono text-xs">ExecutiveDashboard.jsx</td><td><span class="chip" style="background:#e2e8f0;color:#475569">todo</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="text-center text-xs text-slate-400 py-10">— ACE Style Guide · อ้างอิงไฟล์ข้อความเต็ม: design-mocks/STYLE_PROMPT.md —</div>
+</main>
+</body>
+</html>

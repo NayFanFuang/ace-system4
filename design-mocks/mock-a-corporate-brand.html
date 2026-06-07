@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Mock A — Corporate Brand · ACE System</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand: #2447d8;
+    --brand-700:#1d3bb8;
+    --brand-50:#eef2ff;
+    --accent:#c73b32;
+    --ink-900:#0f172a;
+    --ink-600:#475569;
+    --ink-400:#94a3b8;
+    --line:#e2e8f0;
+    --bg:#f5f7fb;
+  }
+  html,body{font-family:"Inter","Sarabun",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink-900)}
+  .ace-hero{background:linear-gradient(135deg,#2447d8 0%,#c73b32 100%)}
+  .ace-side-active{background:linear-gradient(90deg,rgba(36,71,216,.10),transparent);border-left:3px solid var(--brand);color:var(--brand);font-weight:800}
+  .ace-side-link{border-left:3px solid transparent}
+  .ace-side-link:hover{background:#f1f5f9}
+  .ace-card{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .ace-stat-num{font-weight:900;letter-spacing:-.02em}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.02em}
+  .badge-green{background:#dcfce7;color:#15803d}
+  .badge-red{background:#fee2e2;color:#b91c1c}
+  .badge-blue{background:#dbeafe;color:#1e40af}
+  .badge-amber{background:#fef3c7;color:#a16207}
+  .badge-slate{background:#e2e8f0;color:#475569}
+  .dot{width:7px;height:7px;border-radius:999px;display:inline-block}
+</style>
+</head>
+<body class="min-h-screen">
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+    <div class="ace-hero text-white px-5 py-5 flex items-center gap-3">
+      <img src="../frontend/public/ace-logo.png" alt="ACE" width="40" height="40" class="rounded-lg bg-white/95 p-1 object-contain shrink-0">
+      <div>
+        <div class="text-2xl font-black tracking-tight leading-none">ACE</div>
+        <div class="text-[11px] uppercase tracking-[.18em] opacity-80 mt-1">System 4</div>
+      </div>
+    </div>
+    <div class="px-3 py-3 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Overview</div>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">Overview</a>
+    <div class="px-3 pt-3 pb-2 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">My Workspace</div>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">My Profile</a>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">Clock App</a>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">Daily Work Log</a>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">My Tasks / Approvals</a>
+    <div class="px-3 pt-3 pb-2 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Clock</div>
+    <a class="ace-side-active block px-5 py-2.5 text-sm">Clock Monitor</a>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">Live Wallboard</a>
+    <div class="px-3 pt-3 pb-2 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">HR</div>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">HR Employees</a>
+    <div class="px-3 pt-3 pb-2 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Finance</div>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">Revenue & Expense</a>
+    <a class="ace-side-link block px-5 py-2.5 text-sm text-slate-700">PO Import</a>
+    <div class="mt-auto px-4 py-4 border-t border-slate-200">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-[var(--brand)] text-white grid place-items-center font-bold">PP</div>
+        <div class="leading-tight">
+          <div class="text-sm font-bold">Peerapol P.</div>
+          <div class="text-[11px] text-slate-500">SUPER_ADMIN</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <!-- Topbar -->
+    <header class="bg-white border-b border-slate-200 px-8 h-16 flex items-center gap-6">
+      <div class="text-xs text-slate-500 flex items-center gap-2">
+        <span>Clock</span><span class="text-slate-300">/</span><span class="text-slate-900 font-bold">Clock Monitor</span>
+      </div>
+      <div class="ml-auto flex items-center gap-4">
+        <input class="px-3 py-2 text-sm rounded-lg border border-slate-200 w-72 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30" placeholder="ค้นหาพนักงาน, โปรเจค, ไซต์…">
+        <button class="px-3 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50">🔔</button>
+      </div>
+    </header>
+
+    <!-- Page -->
+    <div class="p-8 space-y-6">
+      <div>
+        <h1 class="text-2xl font-black tracking-tight">Clock Monitor</h1>
+        <p class="text-sm text-slate-500 mt-1">ติดตามสถานะการเข้า-ออกงานของทีมแบบ Real-time · 31 พ.ค. 2026</p>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="grid grid-cols-4 gap-4">
+        <div class="ace-card p-5">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Clocked In</div>
+          <div class="ace-stat-num text-3xl mt-2 text-[var(--brand)]">142</div>
+          <div class="text-xs text-slate-500 mt-2">จากทั้งหมด 168 คน</div>
+        </div>
+        <div class="ace-card p-5">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500">On Site</div>
+          <div class="ace-stat-num text-3xl mt-2 text-emerald-600">118</div>
+          <div class="text-xs text-slate-500 mt-2">GPS อยู่ในรัศมีไซต์</div>
+        </div>
+        <div class="ace-card p-5">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Off Site</div>
+          <div class="ace-stat-num text-3xl mt-2 text-[var(--accent)]">24</div>
+          <div class="text-xs text-slate-500 mt-2">นอกรัศมีหรือไม่มี GPS</div>
+        </div>
+        <div class="ace-card p-5">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Not Yet</div>
+          <div class="ace-stat-num text-3xl mt-2 text-slate-400">26</div>
+          <div class="text-xs text-slate-500 mt-2">ยังไม่ Clock In วันนี้</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-3 gap-4">
+        <div class="ace-card p-5 col-span-2">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="font-bold">การเข้างานรายชั่วโมง</div>
+              <div class="text-xs text-slate-500">เปรียบเทียบวันนี้กับสัปดาห์ที่แล้ว</div>
+            </div>
+            <div class="flex gap-3 text-xs">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-[#2447d8]"></span>วันนี้</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-[#c73b32] opacity-60"></span>สัปดาห์ที่แล้ว</span>
+            </div>
+          </div>
+          <div class="h-56"><canvas id="chartA1"></canvas></div>
+        </div>
+        <div class="ace-card p-5">
+          <div class="font-bold mb-1">Status Breakdown</div>
+          <div class="text-xs text-slate-500 mb-3">วันนี้ · 168 คน</div>
+          <div class="h-56 grid place-items-center"><canvas id="chartA2"></canvas></div>
+        </div>
+        <div class="ace-card p-5 col-span-3">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="font-bold">Coverage by Project</div>
+              <div class="text-xs text-slate-500">% ของพนักงานที่ Clock In ในรัศมีไซต์ (7 วันย้อนหลัง)</div>
+            </div>
+            <button class="text-xs text-[var(--brand)] font-bold hover:underline">ดู Report เต็ม →</button>
+          </div>
+          <div class="h-48"><canvas id="chartA3"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 border-b border-slate-200">
+        <button class="px-4 py-2 text-sm font-bold text-[var(--brand)] border-b-2 border-[var(--brand)] -mb-px">Daily</button>
+        <button class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-900">Weekly</button>
+        <button class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-900">Monthly</button>
+        <button class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-900">Map Live</button>
+        <button class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-900">Leave Requests</button>
+      </div>
+
+      <!-- Table -->
+      <div class="ace-card overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div class="font-bold">รายชื่อพนักงานวันนี้</div>
+          <div class="flex gap-2">
+            <select class="text-sm rounded-lg border border-slate-200 px-2 py-1.5"><option>ทุก Team</option></select>
+            <button class="px-3 py-1.5 text-sm rounded-lg bg-[var(--brand)] text-white font-bold hover:bg-[var(--brand-700)]">Export PDF</button>
+          </div>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+            <tr>
+              <th class="text-left px-5 py-3 font-bold">Employee</th>
+              <th class="text-left py-3 font-bold">Project</th>
+              <th class="text-left py-3 font-bold">Site</th>
+              <th class="text-left py-3 font-bold">Clock In</th>
+              <th class="text-left py-3 font-bold">Status</th>
+              <th class="text-right px-5 py-3 font-bold"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr class="hover:bg-slate-50">
+              <td class="px-5 py-3"><div class="font-bold">Peerapol Piamsri</div><div class="text-xs text-slate-500">ACE056 · DTE</div></td>
+              <td>HWT2304</td><td>BKK-RF-014</td><td>07:48</td>
+              <td><span class="badge badge-green"><span class="dot bg-emerald-500"></span>On Site</span></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-5 py-3"><div class="font-bold">Somchai Wong</div><div class="text-xs text-slate-500">ACE112 · TE</div></td>
+              <td>HWT2604</td><td>—</td><td>08:02</td>
+              <td><span class="badge badge-blue"><span class="dot bg-blue-500"></span>Office</span></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-5 py-3"><div class="font-bold">Niran Chaisri</div><div class="text-xs text-slate-500">ACE201 · DTA</div></td>
+              <td>HWT2304</td><td>CNX-RF-002</td><td>08:15</td>
+              <td><span class="badge badge-red"><span class="dot bg-red-500"></span>Off Site</span></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-5 py-3"><div class="font-bold">Achara Suk</div><div class="text-xs text-slate-500">ACE318 · DTE</div></td>
+              <td>HWT2604</td><td>UBN-RF-007</td><td>—</td>
+              <td><span class="badge badge-slate"><span class="dot bg-slate-400"></span>Not Yet</span></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="px-5 py-3"><div class="font-bold">Wichai Bun</div><div class="text-xs text-slate-500">ACE405 · PM</div></td>
+              <td>—</td><td>—</td><td>09:30</td>
+              <td><span class="badge badge-amber"><span class="dot bg-amber-500"></span>Leave</span></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="text-center text-xs text-slate-400 pt-4">— Mock A · Corporate Brand · gradient blue → red, 14px radius, bold typography —</div>
+    </div>
+  </main>
+</div>
+<script>
+  Chart.defaults.font.family = 'Inter, Sarabun, sans-serif'
+  Chart.defaults.font.weight = '600'
+  Chart.defaults.color = '#475569'
+
+  new Chart(document.getElementById('chartA1'), {
+    type: 'line',
+    data: {
+      labels: ['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00'],
+      datasets: [
+        { label: 'วันนี้', data: [2,18,72,142,148,151,155,148,142,138], borderColor: '#2447d8', backgroundColor: 'rgba(36,71,216,.12)', tension: .35, fill: true, borderWidth: 3, pointRadius: 0, pointHoverRadius: 5 },
+        { label: 'สัปดาห์ที่แล้ว', data: [1,12,58,128,140,144,148,142,138,132], borderColor: '#c73b32', backgroundColor: 'rgba(199,59,50,.06)', tension: .35, fill: false, borderWidth: 2, borderDash: [6,4], pointRadius: 0 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},beginAtZero:true}} }
+  })
+
+  new Chart(document.getElementById('chartA2'), {
+    type: 'doughnut',
+    data: {
+      labels: ['On Site','Office','Off Site','Leave','Not Yet'],
+      datasets: [{ data:[118,24,24,5,26], backgroundColor:['#16a34a','#2447d8','#c73b32','#d97706','#cbd5e1'], borderWidth:0 }]
+    },
+    options: { cutout:'66%', plugins:{legend:{position:'bottom', labels:{boxWidth:8, padding:10, font:{size:11}}}} }
+  })
+
+  new Chart(document.getElementById('chartA3'), {
+    type: 'bar',
+    data: {
+      labels: ['HWT2304','HWT2604','HWT2105','HWT2208','HWT2412','HWT2701','HWT2808','HWT2920'],
+      datasets: [
+        { label:'On Site %', data:[92,87,78,84,73,68,90,82], backgroundColor:'#2447d8', borderRadius:6, barThickness:22 },
+        { label:'Target %', data:[85,85,85,85,85,85,85,85], type:'line', borderColor:'#c73b32', borderWidth:2, borderDash:[5,5], pointRadius:0, tension:0 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', align:'end', labels:{boxWidth:10, font:{size:11}}}}, scales:{x:{grid:{display:false}}, y:{max:100, grid:{color:'#f1f5f9'}}}}
+  })
+</script>
+</body>
+</html>

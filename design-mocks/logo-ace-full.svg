@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="56" viewBox="0 0 220 56" fill="none">
+  <rect x="2" y="2" width="52" height="52" rx="13" fill="url(#aceGradF)"/>
+  <path d="M17.4 38 L28 17 L38.6 38" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21.8 30.5 H34.2" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="28" cy="17" r="3" fill="#fff"/>
+  <text x="68" y="30" font-family="'Sora','Inter',sans-serif" font-weight="800" font-size="24" letter-spacing="-.5" fill="#0f172a">ACE</text>
+  <text x="124" y="30" font-family="'Inter',sans-serif" font-weight="600" font-size="24" letter-spacing="-.5" fill="#94a3b8">System</text>
+  <text x="68" y="45" font-family="'Inter',sans-serif" font-weight="500" font-size="9.5" letter-spacing="1.2" fill="#64748b">OPERATIONS PLATFORM</text>
+  <defs>
+    <linearGradient id="aceGradF" x1="2" y1="2" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2447d8"/>
+      <stop offset="1" stop-color="#c73b32"/>
+    </linearGradient>
+  </defs>
+</svg>

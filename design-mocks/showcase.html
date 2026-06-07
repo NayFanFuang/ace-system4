@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Component & Chart Showcase · ACE System</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sarabun:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand:#2447d8; --brand-700:#1d3bb8; --brand-50:#eef2ff;
+    --accent:#c73b32;
+    --ok:#16a34a; --warn:#d97706; --err:#dc2626; --info:#0ea5e9;
+    --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --bg:#f6f8fc;
+  }
+  html,body{font-family:"Inter","Sarabun",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+  .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .anchor{scroll-margin-top:80px}
+
+  /* ───── Buttons ───── */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;transition:all .18s cubic-bezier(.2,.6,.3,1);cursor:pointer;border:1px solid transparent;position:relative;overflow:hidden}
+  .btn:active{transform:translateY(1px) scale(.98)}
+  .btn-primary{background:var(--brand);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 8px 18px -8px rgba(36,71,216,.55)}
+  .btn-primary:hover{background:var(--brand-700);box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 12px 26px -8px rgba(36,71,216,.7);transform:translateY(-1px)}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn-ghost:hover{background:#f1f5f9;border-color:#cbd5e1}
+  .btn-danger{background:var(--err);color:#fff}
+  .btn-danger:hover{background:#b91c1c;transform:translateY(-1px)}
+  .btn-success{background:var(--ok);color:#fff}
+  .btn-success:hover{background:#15803d;transform:translateY(-1px)}
+  .btn-soft{background:var(--brand-50);color:var(--brand)}
+  .btn-soft:hover{background:#e0e7ff}
+  .btn-icon{padding:8px;width:34px;justify-content:center}
+  .ripple::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.45) 0%,transparent 50%);opacity:0;transition:opacity .5s}
+  .ripple:active::after{opacity:1;transition:opacity 0s}
+
+  /* ───── Card ───── */
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;transition:box-shadow .2s,transform .2s}
+  .card-hover:hover{box-shadow:0 16px 40px -16px rgba(15,23,42,.18);transform:translateY(-2px)}
+
+  /* ───── Inputs ───── */
+  .field{display:block;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;background:#fff;transition:border-color .15s,box-shadow .15s}
+  .field:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px rgba(36,71,216,.12)}
+  .field-icon{position:relative}
+  .field-icon input{padding-left:34px}
+  .field-icon .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none}
+
+  /* Switch */
+  .switch{position:relative;display:inline-block;width:42px;height:24px;cursor:pointer}
+  .switch input{opacity:0;width:0;height:0}
+  .switch .slider{position:absolute;inset:0;background:#cbd5e1;border-radius:24px;transition:background .25s}
+  .switch .slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .25s cubic-bezier(.2,.6,.3,1)}
+  .switch input:checked + .slider{background:var(--brand)}
+  .switch input:checked + .slider::before{transform:translateX(18px)}
+
+  /* Checkbox */
+  .check{appearance:none;width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:5px;cursor:pointer;position:relative;transition:all .15s}
+  .check:checked{background:var(--brand);border-color:var(--brand)}
+  .check:checked::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);animation:checkPop .25s ease}
+  @keyframes checkPop{from{opacity:0;transform:rotate(45deg) scale(.5)}to{opacity:1;transform:rotate(45deg) scale(1)}}
+
+  /* Radio */
+  .radio{appearance:none;width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:50%;cursor:pointer;position:relative;transition:all .15s}
+  .radio:checked{border-color:var(--brand);border-width:5px}
+
+  /* Slider (range) */
+  input[type=range]{appearance:none;width:100%;height:6px;background:#e2e8f0;border-radius:6px;outline:none}
+  input[type=range]::-webkit-slider-thumb{appearance:none;width:18px;height:18px;border-radius:50%;background:var(--brand);cursor:pointer;border:3px solid #fff;box-shadow:0 2px 8px rgba(36,71,216,.4);transition:transform .15s}
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+
+  /* ───── Badges / chips ───── */
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em}
+  .b-green{background:#dcfce7;color:#15803d}
+  .b-red{background:#fee2e2;color:#b91c1c}
+  .b-blue{background:#dbeafe;color:#1e40af}
+  .b-amber{background:#fef3c7;color:#a16207}
+  .b-purple{background:#ede9fe;color:#6d28d9}
+  .b-slate{background:#e2e8f0;color:#475569}
+  .dot{width:6px;height:6px;border-radius:999px;display:inline-block}
+  .pulse{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.5}}
+
+  /* ───── Alerts ───── */
+  .alert{display:flex;gap:10px;padding:12px 14px;border-radius:10px;border:1px solid;font-size:13px}
+  .alert-info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+  .alert-warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+  .alert-error{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+  .alert-success{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}
+
+  /* ───── Tabs ───── */
+  .tab{padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;transition:all .15s}
+  .tab:hover{background:#f1f5f9;color:var(--ink)}
+  .tab.active{background:var(--brand);color:#fff}
+
+  /* ───── Progress ───── */
+  .bar{height:8px;background:#f1f5f9;border-radius:999px;overflow:hidden;position:relative}
+  .bar > i{display:block;height:100%;border-radius:999px;background:var(--brand);transition:width 1s cubic-bezier(.2,.7,.3,1)}
+  .bar-striped > i{background:repeating-linear-gradient(45deg,var(--brand),var(--brand) 8px,#3b59e0 8px,#3b59e0 16px);animation:stripeMove 1s linear infinite}
+  @keyframes stripeMove{from{background-position:0 0}to{background-position:32px 0}}
+
+  /* Spinner */
+  .spinner{width:22px;height:22px;border:2.5px solid #e2e8f0;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Skeleton */
+  .skel{background:linear-gradient(90deg,#eef2f7 0%,#f8fafc 50%,#eef2f7 100%);background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:6px}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  /* ───── Modal ───── */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50;opacity:0;transition:opacity .2s}
+  .overlay.show{display:flex;opacity:1}
+  .modal{background:#fff;border-radius:16px;width:min(90vw,460px);padding:24px;transform:translateY(20px) scale(.96);transition:all .25s cubic-bezier(.2,.6,.3,1)}
+  .overlay.show .modal{transform:translateY(0) scale(1)}
+
+  /* ───── Drawer ───── */
+  .drawer-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:50;display:none;opacity:0;transition:opacity .2s}
+  .drawer-overlay.show{display:block;opacity:1}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:min(90vw,420px);background:#fff;z-index:60;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.6,.3,1);display:flex;flex-direction:column}
+  .drawer.show{transform:translateX(0)}
+
+  /* ───── Toast ───── */
+  .toast-wrap{position:fixed;bottom:20px;right:20px;z-index:70;display:flex;flex-direction:column;gap:8px}
+  .toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;display:flex;gap:10px;align-items:center;min-width:240px;transform:translateX(120%);transition:transform .35s cubic-bezier(.2,.7,.3,1);box-shadow:0 16px 40px -8px rgba(15,23,42,.5)}
+  .toast.show{transform:translateX(0)}
+  .toast-ok{background:#15803d}
+  .toast-err{background:#b91c1c}
+
+  /* Tooltip */
+  .tip{position:relative;display:inline-block}
+  .tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(4px);background:var(--ink);color:#fff;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:all .18s}
+  .tip:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* Accordion */
+  details.acc{border:1px solid var(--line);border-radius:10px;padding:0 14px;background:#fff;transition:all .15s}
+  details.acc + details.acc{margin-top:8px}
+  details.acc[open]{box-shadow:0 6px 18px -6px rgba(15,23,42,.08)}
+  details.acc summary{padding:12px 0;cursor:pointer;font-weight:700;list-style:none;display:flex;align-items:center;gap:8px}
+  details.acc summary::-webkit-details-marker{display:none}
+  details.acc summary::after{content:"⌃";margin-left:auto;transition:transform .25s;display:inline-block;font-size:18px;color:#94a3b8;transform:rotate(180deg)}
+  details.acc[open] summary::after{transform:rotate(0deg)}
+  details.acc > div{padding-bottom:14px;font-size:13px;color:var(--muted);line-height:1.6}
+
+  /* Stepper */
+  .step{display:flex;align-items:center;gap:10px;flex:1;position:relative}
+  .step .num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:#e2e8f0;color:#64748b;transition:all .25s;flex-shrink:0}
+  .step.done .num{background:var(--ok);color:#fff}
+  .step.active .num{background:var(--brand);color:#fff;box-shadow:0 0 0 4px rgba(36,71,216,.2)}
+  .step + .step::before{content:"";position:absolute;left:-50%;right:50%;top:14px;height:2px;background:#e2e8f0;z-index:-1}
+  .step.done + .step::before, .step.done.active::before{background:var(--ok)}
+
+  /* Avatars */
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;display:inline-grid;place-items:center;font-weight:700;font-size:12px;border:2px solid #fff}
+  .avatar-group{display:inline-flex}
+  .avatar-group .avatar + .avatar{margin-left:-10px}
+
+  /* Heatmap cell */
+  .hm-cell{width:14px;height:14px;border-radius:3px;background:#eef2f7;transition:transform .15s}
+  .hm-cell:hover{transform:scale(1.4);outline:1px solid var(--brand)}
+
+  /* Gauge */
+  .gauge{position:relative;width:160px;height:90px;overflow:hidden}
+  .gauge svg{display:block}
+  .gauge-needle{transform-origin:80px 80px;transition:transform 1s cubic-bezier(.2,.6,.3,1)}
+
+  /* Counter pop */
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .fade-up{animation:fadeUp .35s ease both}
+
+  /* Sticky TOC */
+  .toc a{display:block;padding:5px 10px;border-radius:6px;font-size:12px;color:#64748b;border-left:2px solid transparent;transition:all .15s}
+  .toc a:hover{background:#f1f5f9;color:var(--ink)}
+  .toc a.active{background:var(--brand-50);color:var(--brand);border-left-color:var(--brand);font-weight:700}
+
+  /* Section title */
+  h2.sec{font-size:20px;font-weight:900;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+  h2.sec .ix{font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.1em}
+  .sec-desc{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .block{margin-top:42px}
+</style>
+</head>
+<body>
+
+<!-- ───── Top bar ───── -->
+<header class="bg-white/85 backdrop-blur border-b border-slate-200 sticky top-0 z-30">
+  <div class="max-w-[1400px] mx-auto px-6 h-14 flex items-center gap-4">
+    <img src="../frontend/public/ace-logo.png" alt="ACE" width="34" height="34" class="rounded-lg object-contain">
+    <div class="font-black text-lg tracking-tight">ACE · Showcase</div>
+    <span class="badge b-blue">v0.1 · gallery</span>
+    <div class="ml-auto flex items-center gap-2">
+      <button class="btn btn-ghost" onclick="document.documentElement.scrollTop=0">↑ Top</button>
+      <button class="btn btn-primary ripple" onclick="toast('บันทึกแล้ว','ok')">บันทึก</button>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-[1400px] mx-auto px-6 grid grid-cols-12 gap-8 py-8">
+
+  <!-- ───── TOC ───── -->
+  <aside class="col-span-2 sticky top-20 self-start toc">
+    <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 px-2">Sections</div>
+    <a href="#colors">01 · Colors</a>
+    <a href="#typography">02 · Typography</a>
+    <a href="#buttons">03 · Buttons</a>
+    <a href="#inputs">04 · Inputs</a>
+    <a href="#badges">05 · Badges & Alerts</a>
+    <a href="#nav">06 · Navigation</a>
+    <a href="#data">07 · Data display</a>
+    <a href="#feedback">08 · Feedback</a>
+    <a href="#overlays">09 · Overlays</a>
+    <a href="#charts">10 · Charts (interactive)</a>
+    <a href="#advanced">11 · Advanced viz</a>
+    <a href="#map">12 · Map</a>
+    <a href="#motion">13 · Motion</a>
+  </aside>
+
+  <main class="col-span-10 space-y-2">
+
+    <!-- ============ 01 · Colors ============ -->
+    <section id="colors" class="anchor">
+      <h2 class="sec"><span class="ix">01</span>Colors & tokens</h2>
+      <div class="sec-desc">Brand, semantic, and neutral palette — ใช้ผ่าน Tailwind class หรือ CSS variables</div>
+      <div class="grid grid-cols-6 gap-3">
+        <div class="card p-3"><div class="h-16 rounded-lg" style="background:#2447d8"></div><div class="mt-2 text-xs font-bold">Brand</div><div class="text-[10.5px] text-slate-500 mono">#2447d8</div></div>
+        <div class="card p-3"><div class="h-16 rounded-lg" style="background:#c73b32"></div><div class="mt-2 text-xs font-bold">Accent</div><div class="text-[10.5px] text-slate-500 mono">#c73b32</div></div>
+        <div class="card p-3"><div class="h-16 rounded-lg" style="background:#16a34a"></div><div class="mt-2 text-xs font-bold">Success</div><div class="text-[10.5px] text-slate-500 mono">#16a34a</div></div>
+        <div class="card p-3"><div class="h-16 rounded-lg" style="background:#d97706"></div><div class="mt-2 text-xs font-bold">Warning</div><div class="text-[10.5px] text-slate-500 mono">#d97706</div></div>
+        <div class="card p-3"><div class="h-16 rounded-lg" style="background:#dc2626"></div><div class="mt-2 text-xs font-bold">Error</div><div class="text-[10.5px] text-slate-500 mono">#dc2626</div></div>
+        <div class="card p-3"><div class="h-16 rounded-lg" style="background:#0ea5e9"></div><div class="mt-2 text-xs font-bold">Info</div><div class="text-[10.5px] text-slate-500 mono">#0ea5e9</div></div>
+      </div>
+      <div class="mt-3 grid grid-cols-11 gap-1">
+        <!-- Neutral scale -->
+        <script>
+          // injected via JS so we don't repeat
+        </script>
+        <div class="h-10 rounded" style="background:#f8fafc"></div>
+        <div class="h-10 rounded" style="background:#f1f5f9"></div>
+        <div class="h-10 rounded" style="background:#e2e8f0"></div>
+        <div class="h-10 rounded" style="background:#cbd5e1"></div>
+        <div class="h-10 rounded" style="background:#94a3b8"></div>
+        <div class="h-10 rounded" style="background:#64748b"></div>
+        <div class="h-10 rounded" style="background:#475569"></div>
+        <div class="h-10 rounded" style="background:#334155"></div>
+        <div class="h-10 rounded" style="background:#1e293b"></div>
+        <div class="h-10 rounded" style="background:#0f172a"></div>
+        <div class="h-10 rounded" style="background:#020617"></div>
+      </div>
+    </section>
+
+    <!-- ============ 02 · Typography ============ -->
+    <section id="typography" class="block anchor">
+      <h2 class="sec"><span class="ix">02</span>Typography</h2>
+      <div class="sec-desc">Inter (Latin) + Sarabun (Thai) + JetBrains Mono (numerics/code)</div>
+      <div class="card p-6 space-y-3">
+        <div class="text-4xl font-black tracking-tight">ACE System — Display 36</div>
+        <div class="text-2xl font-bold tracking-tight">หัวข้อหลัก / Heading 24</div>
+        <div class="text-xl font-semibold">Section title / 20 semibold</div>
+        <div class="text-base">Body 16 regular — ระบบรายงาน DTE ทั้งหมดของบริษัท</div>
+        <div class="text-sm text-slate-600">Body 14 muted — รายงานล่าสุดได้รับการอัปเดตเมื่อ 09:42</div>
+        <div class="text-xs text-slate-500 uppercase tracking-widest font-bold">overline / micro caps</div>
+        <div class="mono text-sm">mono · 1234567890 · GET /api/clock/monitor/events?date=2026-05-31</div>
+      </div>
+    </section>
+
+    <!-- ============ 03 · Buttons ============ -->
+    <section id="buttons" class="block anchor">
+      <h2 class="sec"><span class="ix">03</span>Buttons</h2>
+      <div class="sec-desc">Hover เพื่อดู transition · กดเพื่อดู ripple/press effect</div>
+      <div class="card p-6">
+        <div class="flex flex-wrap items-center gap-3">
+          <button class="btn btn-primary ripple">Primary</button>
+          <button class="btn btn-ghost">Ghost</button>
+          <button class="btn btn-soft">Soft</button>
+          <button class="btn btn-success ripple">✓ Approve</button>
+          <button class="btn btn-danger ripple">✕ Reject</button>
+          <button class="btn btn-primary ripple"><span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Saving…</button>
+          <button class="btn btn-ghost btn-icon">⚙</button>
+          <button class="btn btn-ghost btn-icon">🔔</button>
+        </div>
+        <div class="mt-5 pt-5 border-t border-slate-100">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">With sizing & icons</div>
+          <div class="flex flex-wrap items-center gap-3">
+            <button class="btn btn-primary ripple" style="padding:6px 10px;font-size:12px">Small</button>
+            <button class="btn btn-primary ripple">Default</button>
+            <button class="btn btn-primary ripple" style="padding:12px 18px;font-size:14px">Large</button>
+            <button class="btn btn-primary ripple">⬇ Export PDF</button>
+            <button class="btn btn-ghost">Cancel</button>
+            <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+              <button class="px-3 py-2 text-xs font-bold bg-slate-100">Day</button>
+              <button class="px-3 py-2 text-xs font-bold hover:bg-slate-50">Week</button>
+              <button class="px-3 py-2 text-xs font-bold hover:bg-slate-50">Month</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 04 · Inputs ============ -->
+    <section id="inputs" class="block anchor">
+      <h2 class="sec"><span class="ix">04</span>Inputs & forms</h2>
+      <div class="sec-desc">Focus ring + switch/slider animation</div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="card p-6 space-y-4">
+          <div>
+            <label class="text-xs font-bold text-slate-600 block mb-1.5">ค้นหา</label>
+            <div class="field-icon"><span class="ico">⌕</span><input class="field" placeholder="ค้นหาพนักงาน, โปรเจค…"></div>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-600 block mb-1.5">Email</label>
+            <input class="field" value="peerapol@ace.co.th">
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-600 block mb-1.5">Project</label>
+            <select class="field">
+              <option>HWT2304 — RF Drive Test</option>
+              <option>HWT2604 — Pre-site</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-600 block mb-1.5">Reason</label>
+            <textarea class="field" rows="3" placeholder="เหตุผลการอนุมัติ…"></textarea>
+          </div>
+        </div>
+        <div class="card p-6 space-y-5">
+          <div>
+            <div class="text-xs font-bold text-slate-600 mb-2">Permissions</div>
+            <div class="flex items-center gap-3 mb-2"><label class="switch"><input type="checkbox" checked><span class="slider"></span></label><span class="text-sm">Enabled</span></div>
+            <div class="flex items-center gap-3 mb-2"><label class="switch"><input type="checkbox" checked><span class="slider"></span></label><span class="text-sm">Require GPS</span></div>
+            <div class="flex items-center gap-3"><label class="switch"><input type="checkbox"><span class="slider"></span></label><span class="text-sm">Require Photo</span></div>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-600 mb-2">Clock Type</div>
+            <div class="flex flex-wrap gap-4 text-sm">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="ct" class="radio" checked> Per-site</label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="ct" class="radio"> Daily</label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="ct" class="radio"> Hybrid</label>
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-600 mb-2">Required fields</div>
+            <div class="flex flex-wrap gap-4 text-sm">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="check" checked> Selfie</label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="check" checked> GPS</label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="check"> Notes</label>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-xs font-bold text-slate-600 mb-2"><span>Geofence radius</span><span id="rad-val" class="mono text-[var(--brand)]">120 m</span></div>
+            <input type="range" min="20" max="500" value="120" id="rad" oninput="document.getElementById('rad-val').textContent=this.value+' m'">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 05 · Badges & Alerts ============ -->
+    <section id="badges" class="block anchor">
+      <h2 class="sec"><span class="ix">05</span>Badges, chips, alerts</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="card p-6">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Status badges</div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="badge b-green"><span class="dot bg-emerald-500"></span>On Site</span>
+            <span class="badge b-blue"><span class="dot bg-blue-500"></span>Office</span>
+            <span class="badge b-red"><span class="dot bg-red-500"></span>Off Site</span>
+            <span class="badge b-amber"><span class="dot bg-amber-500"></span>Leave</span>
+            <span class="badge b-slate"><span class="dot bg-slate-400"></span>Not Yet</span>
+            <span class="badge b-purple">DTE</span>
+            <span class="badge b-blue">PM</span>
+            <span class="badge b-slate">DRAFT</span>
+          </div>
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Live indicator</div>
+          <div class="flex items-center gap-2 text-sm">
+            <span class="relative inline-flex"><span class="dot bg-emerald-500 pulse absolute"></span><span class="dot bg-emerald-500"></span></span>
+            <span>LIVE · Backend healthy · 12ms</span>
+          </div>
+        </div>
+        <div class="card p-6 space-y-3">
+          <div class="alert alert-info">ℹ️ ระบบจะ refresh ข้อมูลทุก 30 วินาที</div>
+          <div class="alert alert-success">✓ บันทึก KPI สำหรับเดือน 2026-05 เรียบร้อย</div>
+          <div class="alert alert-warn">⚠ พบ 3 รายการที่ Clock-in โดยไม่มีรูปถ่าย</div>
+          <div class="alert alert-error">✕ การ import PO ล้มเหลว — ไฟล์ Excel มี column ขาด</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 06 · Navigation ============ -->
+    <section id="nav" class="block anchor">
+      <h2 class="sec"><span class="ix">06</span>Navigation</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="card p-6">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Tabs</div>
+          <div class="flex gap-2" id="tabs">
+            <button class="tab active" data-tab="1">Daily</button>
+            <button class="tab" data-tab="2">Weekly</button>
+            <button class="tab" data-tab="3">Monthly</button>
+            <button class="tab" data-tab="4">Map</button>
+          </div>
+          <div id="tab-body" class="mt-4 p-4 rounded-lg bg-slate-50 text-sm fade-up">เลือก Daily — แสดง 142 คน Clock-in วันนี้</div>
+
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 mt-6">Breadcrumb</div>
+          <div class="text-sm text-slate-500 flex items-center gap-2">
+            <a class="hover:text-slate-900">Clock</a><span class="text-slate-300">›</span>
+            <a class="hover:text-slate-900">Monitor</a><span class="text-slate-300">›</span>
+            <span class="text-slate-900 font-bold">Daily</span>
+          </div>
+
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 mt-6">Pagination</div>
+          <div class="flex items-center gap-1">
+            <button class="btn btn-ghost btn-icon">‹</button>
+            <button class="btn btn-primary" style="padding:6px 10px;font-size:12px">1</button>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px">2</button>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px">3</button>
+            <span class="text-slate-400 px-2">…</span>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px">28</button>
+            <button class="btn btn-ghost btn-icon">›</button>
+          </div>
+        </div>
+
+        <div class="card p-6">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Stepper · Leave approval</div>
+          <div class="flex items-start gap-2">
+            <div class="step done"><div class="num">✓</div><div class="text-xs"><div class="font-bold">Submit</div><div class="text-slate-500">31 พ.ค.</div></div></div>
+            <div class="step done"><div class="num">✓</div><div class="text-xs"><div class="font-bold">PM</div><div class="text-slate-500">31 พ.ค.</div></div></div>
+            <div class="step active"><div class="num">3</div><div class="text-xs"><div class="font-bold">PD</div><div class="text-slate-500">pending</div></div></div>
+            <div class="step"><div class="num">4</div><div class="text-xs"><div class="font-bold text-slate-400">HR Ack</div></div></div>
+          </div>
+
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mt-6 mb-3">Accordion</div>
+          <details class="acc"><summary>การตั้งค่า Clock</summary><div>ตั้งค่า GPS radius, photo requirement, working hours ของแต่ละ role ได้ที่หน้านี้</div></details>
+          <details class="acc" open><summary>การส่งใบลา</summary><div>เลือกประเภทลา → ระบบจะส่งอีเมลให้ PM อนุมัติอัตโนมัติ ลิงค์อนุมัติฝังในอีเมลโดยตรง</div></details>
+          <details class="acc"><summary>การ Export Timesheet</summary><div>กดปุ่ม Export PDF ที่หน้า Daily Worklog — ลายเซ็นจะถูกแนบอัตโนมัติถ้ามี</div></details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 07 · Data display ============ -->
+    <section id="data" class="block anchor">
+      <h2 class="sec"><span class="ix">07</span>Data display</h2>
+      <div class="grid grid-cols-3 gap-4">
+        <!-- Stat cards animated -->
+        <div class="card card-hover p-5">
+          <div class="text-xs font-bold uppercase text-slate-500">Clocked In</div>
+          <div class="text-3xl font-black tracking-tight mt-2" data-counter="142">0</div>
+          <div class="text-xs text-emerald-600 font-bold mt-2">↑ 8 vs yesterday</div>
+        </div>
+        <div class="card card-hover p-5">
+          <div class="text-xs font-bold uppercase text-slate-500">On Site</div>
+          <div class="text-3xl font-black tracking-tight mt-2 text-emerald-600" data-counter="118">0</div>
+          <div class="text-xs text-slate-500 mt-2">83% of clocked-in</div>
+        </div>
+        <div class="card card-hover p-5">
+          <div class="text-xs font-bold uppercase text-slate-500">Pending Leaves</div>
+          <div class="text-3xl font-black tracking-tight mt-2 text-amber-600" data-counter="7">0</div>
+          <div class="text-xs text-slate-500 mt-2">3 sick · 4 annual</div>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="flex items-center justify-between p-5 border-b border-slate-100">
+          <div>
+            <div class="font-bold">รายชื่อพนักงานวันนี้</div>
+            <div class="text-xs text-slate-500">168 employees · click row to expand</div>
+          </div>
+          <div class="flex gap-2">
+            <div class="avatar-group">
+              <span class="avatar" style="background:#2447d8">PP</span>
+              <span class="avatar" style="background:#16a34a">SW</span>
+              <span class="avatar" style="background:#d97706">NC</span>
+              <span class="avatar" style="background:#64748b">+5</span>
+            </div>
+            <button class="btn btn-soft">Filter</button>
+            <button class="btn btn-primary ripple">Export</button>
+          </div>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="text-left px-5 py-3 font-bold">Employee</th>
+              <th class="text-left py-3 font-bold">Project</th>
+              <th class="text-left py-3 font-bold">Clock In</th>
+              <th class="text-left py-3 font-bold">Status</th>
+              <th class="text-left py-3 font-bold">KPI</th>
+              <th class="text-right px-5 py-3 font-bold"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr class="hover:bg-slate-50 transition-colors">
+              <td class="px-5 py-3 flex items-center gap-3"><span class="avatar" style="margin:0">PP</span><div><div class="font-bold">Peerapol Piamsri</div><div class="text-xs text-slate-500">ACE056 · DTE</div></div></td>
+              <td>HWT2304</td><td class="mono">07:48</td>
+              <td><span class="badge b-green"><span class="dot bg-emerald-500"></span>On Site</span></td>
+              <td><div class="bar w-24"><i style="width:92%"></i></div></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition-colors">
+              <td class="px-5 py-3 flex items-center gap-3"><span class="avatar" style="margin:0;background:#16a34a">SW</span><div><div class="font-bold">Somchai Wong</div><div class="text-xs text-slate-500">ACE112 · TE</div></div></td>
+              <td>HWT2604</td><td class="mono">08:02</td>
+              <td><span class="badge b-blue"><span class="dot bg-blue-500"></span>Office</span></td>
+              <td><div class="bar w-24"><i style="width:78%"></i></div></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition-colors">
+              <td class="px-5 py-3 flex items-center gap-3"><span class="avatar" style="margin:0;background:#d97706">NC</span><div><div class="font-bold">Niran Chaisri</div><div class="text-xs text-slate-500">ACE201 · DTA</div></div></td>
+              <td>HWT2304</td><td class="mono">08:15</td>
+              <td><span class="badge b-red"><span class="dot bg-red-500"></span>Off Site</span></td>
+              <td><div class="bar w-24"><i style="width:62%;background:#d97706"></i></div></td>
+              <td class="px-5 text-right text-slate-400">⋯</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 08 · Feedback ============ -->
+    <section id="feedback" class="block anchor">
+      <h2 class="sec"><span class="ix">08</span>Feedback / loading</h2>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="card p-5">
+          <div class="text-xs font-bold uppercase text-slate-500 mb-3">Progress · animated</div>
+          <div class="space-y-3">
+            <div><div class="flex justify-between text-xs mb-1"><span>Upload PO</span><span id="pg-val" class="mono">72%</span></div><div class="bar"><i id="pg" style="width:72%"></i></div></div>
+            <div><div class="flex justify-between text-xs mb-1"><span>Indeterminate</span><span class="text-slate-400">…</span></div><div class="bar bar-striped"><i style="width:100%"></i></div></div>
+          </div>
+          <button class="btn btn-soft mt-3" onclick="animateProgress()">▶ Re-animate</button>
+        </div>
+
+        <div class="card p-5">
+          <div class="text-xs font-bold uppercase text-slate-500 mb-3">Spinners</div>
+          <div class="flex items-center gap-6">
+            <div class="spinner"></div>
+            <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
+            <div class="spinner" style="width:40px;height:40px;border-width:4px;border-top-color:#16a34a"></div>
+          </div>
+
+          <div class="text-xs font-bold uppercase text-slate-500 mt-5 mb-3">Skeleton loader</div>
+          <div class="space-y-2">
+            <div class="skel h-3 w-3/4"></div>
+            <div class="skel h-3 w-1/2"></div>
+            <div class="skel h-3 w-5/6"></div>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <div class="text-xs font-bold uppercase text-slate-500 mb-3">Toast triggers</div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn btn-ghost" onclick="toast('บันทึกข้อมูลสำเร็จ','ok')">Success</button>
+            <button class="btn btn-ghost" onclick="toast('เกิดข้อผิดพลาด','err')">Error</button>
+            <button class="btn btn-ghost" onclick="toast('PDF กำลัง render…','')">Info</button>
+          </div>
+
+          <div class="text-xs font-bold uppercase text-slate-500 mt-5 mb-3">Tooltips · hover</div>
+          <div class="flex gap-3">
+            <span class="tip btn btn-ghost btn-icon" data-tip="แก้ไข">✎</span>
+            <span class="tip btn btn-ghost btn-icon" data-tip="ลบ">🗑</span>
+            <span class="tip btn btn-ghost btn-icon" data-tip="ดูประวัติ">⟳</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 09 · Overlays ============ -->
+    <section id="overlays" class="block anchor">
+      <h2 class="sec"><span class="ix">09</span>Overlays · click to open</h2>
+      <div class="card p-6">
+        <div class="flex flex-wrap gap-3">
+          <button class="btn btn-primary ripple" onclick="openModal()">Open Modal</button>
+          <button class="btn btn-ghost" onclick="openDrawer()">Open Drawer</button>
+          <button class="btn btn-soft" onclick="toast('นี่คือ snackbar','ok')">Show Toast</button>
+          <div class="relative inline-block">
+            <button class="btn btn-ghost" onclick="document.getElementById('menu').classList.toggle('hidden')">Dropdown ▾</button>
+            <div id="menu" class="hidden absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 w-48 z-10 fade-up">
+              <a class="block px-4 py-2 text-sm hover:bg-slate-50">โปรไฟล์</a>
+              <a class="block px-4 py-2 text-sm hover:bg-slate-50">การตั้งค่า</a>
+              <div class="border-t border-slate-100 my-1"></div>
+              <a class="block px-4 py-2 text-sm hover:bg-slate-50 text-red-600">ออกจากระบบ</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 10 · Charts (interactive) ============ -->
+    <section id="charts" class="block anchor">
+      <h2 class="sec"><span class="ix">10</span>Charts · interactive & animated</h2>
+      <div class="sec-desc">กดปุ่ม / ลาก slider — Chart.js จะ animate ค่าใหม่อัตโนมัติ</div>
+
+      <div class="grid grid-cols-12 gap-4">
+        <!-- LIVE LINE -->
+        <div class="card p-5 col-span-7">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="font-bold flex items-center gap-2">Live clock-in stream <span class="relative inline-flex"><span class="dot bg-red-500 pulse absolute"></span><span class="dot bg-red-500"></span></span></div>
+              <div class="text-xs text-slate-500">data pushes every 1.5s — ลองดูเส้นวิ่ง</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost" onclick="liveToggle(this)">⏸ Pause</button>
+            </div>
+          </div>
+          <div class="h-56"><canvas id="chLive"></canvas></div>
+        </div>
+
+        <!-- FILTER SWAP -->
+        <div class="card p-5 col-span-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="font-bold">Revenue by month</div>
+              <div class="text-xs text-slate-500">กดปุ่มเพื่อเปลี่ยน account</div>
+            </div>
+          </div>
+          <div class="flex gap-1 mb-3 text-xs">
+            <button class="tab active" data-acct="ALL" onclick="filterRev(this)">ALL</button>
+            <button class="tab" data-acct="RF" onclick="filterRev(this)">RF</button>
+            <button class="tab" data-acct="TE" onclick="filterRev(this)">TE</button>
+            <button class="tab" data-acct="DTE" onclick="filterRev(this)">DTE</button>
+          </div>
+          <div class="h-48"><canvas id="chRev"></canvas></div>
+        </div>
+
+        <!-- DONUT WITH HIGHLIGHT -->
+        <div class="card p-5 col-span-4">
+          <div class="font-bold mb-1">Status Mix</div>
+          <div class="text-xs text-slate-500 mb-3">click legend เพื่อ toggle</div>
+          <div class="h-52"><canvas id="chDonut"></canvas></div>
+        </div>
+
+        <!-- BAR WITH SLIDER -->
+        <div class="card p-5 col-span-8">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="font-bold">Project allocation · drag slider</div>
+              <div class="text-xs text-slate-500">เปลี่ยน Total Hours แล้วดู bar ปรับอัตโนมัติ</div>
+            </div>
+            <div class="text-xs flex items-center gap-3">
+              <span class="text-slate-500">Total:</span>
+              <input type="range" min="100" max="1000" value="600" id="allocRange" class="w-40">
+              <span id="allocVal" class="mono font-bold text-[var(--brand)] w-14 text-right">600h</span>
+            </div>
+          </div>
+          <div class="h-56"><canvas id="chAlloc"></canvas></div>
+        </div>
+
+        <!-- RADAR -->
+        <div class="card p-5 col-span-6">
+          <div class="font-bold mb-1">KPI radar · employee ACE056</div>
+          <div class="text-xs text-slate-500 mb-3">period 2026-05 — hover bar เพื่อ highlight</div>
+          <div class="h-64"><canvas id="chRadar"></canvas></div>
+        </div>
+
+        <!-- AREA STACKED -->
+        <div class="card p-5 col-span-6">
+          <div class="font-bold mb-1">Status stack · 30d</div>
+          <div class="text-xs text-slate-500 mb-3">daily breakdown</div>
+          <div class="h-64"><canvas id="chArea"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 11 · Advanced viz ============ -->
+    <section id="advanced" class="block anchor">
+      <h2 class="sec"><span class="ix">11</span>Advanced viz (DIY)</h2>
+      <div class="grid grid-cols-12 gap-4">
+        <!-- GAUGE -->
+        <div class="card p-5 col-span-3">
+          <div class="font-bold mb-1">Coverage gauge</div>
+          <div class="text-xs text-slate-500 mb-4">on-site % target 85%</div>
+          <div class="grid place-items-center">
+            <div class="gauge">
+              <svg width="160" height="90" viewBox="0 0 160 90">
+                <path d="M 10 80 A 70 70 0 0 1 150 80" fill="none" stroke="#e2e8f0" stroke-width="14" stroke-linecap="round"/>
+                <path id="gaugeArc" d="M 10 80 A 70 70 0 0 1 150 80" fill="none" stroke="url(#gg)" stroke-width="14" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="220" style="transition:stroke-dashoffset 1.2s cubic-bezier(.2,.6,.3,1)"/>
+                <defs><linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="#dc2626"/><stop offset=".5" stop-color="#d97706"/><stop offset="1" stop-color="#16a34a"/></linearGradient></defs>
+                <line class="gauge-needle" id="gaugeNeedle" x1="80" y1="80" x2="80" y2="20" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" transform="rotate(-90 80 80)"/>
+                <circle cx="80" cy="80" r="5" fill="#0f172a"/>
+              </svg>
+            </div>
+            <div class="text-3xl font-black mono mt-1" id="gaugeVal">0%</div>
+          </div>
+          <input type="range" min="0" max="100" value="83" id="gaugeRange" class="mt-3 w-full">
+        </div>
+
+        <!-- HEATMAP -->
+        <div class="card p-5 col-span-5">
+          <div class="font-bold mb-1">Attendance heatmap · 13 weeks</div>
+          <div class="text-xs text-slate-500 mb-3">hover cell เพื่อ scale</div>
+          <div id="heatmap" class="flex gap-1"></div>
+          <div class="flex items-center gap-2 mt-3 text-[10.5px] text-slate-500">
+            <span>less</span>
+            <span class="hm-cell" style="background:#eef2f7"></span>
+            <span class="hm-cell" style="background:#bfdbfe"></span>
+            <span class="hm-cell" style="background:#60a5fa"></span>
+            <span class="hm-cell" style="background:#2563eb"></span>
+            <span class="hm-cell" style="background:#1e3a8a"></span>
+            <span>more</span>
+          </div>
+        </div>
+
+        <!-- BULLET / KPI vs target -->
+        <div class="card p-5 col-span-4">
+          <div class="font-bold mb-1">KPI · monthly targets</div>
+          <div class="text-xs text-slate-500 mb-3">bullet chart (actual vs target)</div>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-xs mb-1"><span>Drive Test (sites)</span><span class="mono"><b>142</b> / 160</span></div>
+              <div class="relative h-3 rounded bg-slate-100 overflow-hidden"><div class="absolute inset-y-0 left-0 bg-[var(--brand)]" style="width:88.75%;transition:width 1s"></div><div class="absolute top-0 bottom-0 w-0.5 bg-slate-900" style="left:100%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs mb-1"><span>Report on-time</span><span class="mono"><b>91%</b> / 90%</span></div>
+              <div class="relative h-3 rounded bg-slate-100 overflow-hidden"><div class="absolute inset-y-0 left-0 bg-emerald-500" style="width:91%;transition:width 1s"></div><div class="absolute top-0 bottom-0 w-0.5 bg-slate-900" style="left:90%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs mb-1"><span>Off-site events</span><span class="mono text-red-600"><b>24</b> / 15 limit</span></div>
+              <div class="relative h-3 rounded bg-slate-100 overflow-hidden"><div class="absolute inset-y-0 left-0 bg-red-500" style="width:60%;transition:width 1s"></div><div class="absolute top-0 bottom-0 w-0.5 bg-slate-900" style="left:37.5%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SPARKLINE GRID -->
+        <div class="card p-5 col-span-12">
+          <div class="font-bold mb-3">Sparkline grid · 10 projects · last 14 days</div>
+          <div id="sparkGrid" class="grid grid-cols-5 gap-4"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 12 · Map ============ -->
+    <section id="map" class="block anchor">
+      <h2 class="sec"><span class="ix">12</span>Map (Leaflet)</h2>
+      <div class="sec-desc">สำหรับ Clock Wallboard, Site GPS, Route — pan/zoom ได้</div>
+      <div class="card overflow-hidden">
+        <div id="leafmap" style="height:340px"></div>
+      </div>
+    </section>
+
+    <!-- ============ 13 · Motion ============ -->
+    <section id="motion" class="block anchor">
+      <h2 class="sec"><span class="ix">13</span>Motion principles</h2>
+      <div class="sec-desc">เร็ว (.15-.35s), easing แบบ cubic-bezier(.2,.6,.3,1), ไม่ overdo</div>
+      <div class="grid grid-cols-4 gap-4">
+        <div class="card p-5 card-hover cursor-pointer"><div class="font-bold">Hover lift</div><div class="text-xs text-slate-500 mt-1">hover card — translateY −2px + shadow</div></div>
+        <div class="card p-5 cursor-pointer" onclick="this.querySelector('.demo').classList.toggle('rotate-180')"><div class="font-bold">Click rotate</div><div class="text-xs text-slate-500 mt-1">กดเพื่อหมุน</div><div class="demo text-3xl mt-2 transition-transform duration-500 inline-block">⌃</div></div>
+        <div class="card p-5"><div class="font-bold">Stagger list</div><div class="text-xs text-slate-500 mt-1">refresh page เพื่อดู</div>
+          <ul class="mt-2 space-y-1 text-sm">
+            <li class="fade-up" style="animation-delay:.05s">• item 1</li>
+            <li class="fade-up" style="animation-delay:.1s">• item 2</li>
+            <li class="fade-up" style="animation-delay:.15s">• item 3</li>
+            <li class="fade-up" style="animation-delay:.2s">• item 4</li>
+          </ul>
+        </div>
+        <div class="card p-5"><div class="font-bold">Number flip</div><div class="text-xs text-slate-500 mt-1">click → animate</div>
+          <div class="text-3xl font-black tracking-tight mt-2" id="flip">142</div>
+          <button class="btn btn-soft mt-2" onclick="flipNum()">Re-roll</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="text-center text-xs text-slate-400 py-10">— ACE Component & Chart Showcase · v0.1 · ใช้เป็น reference ก่อน build จริง —</div>
+  </main>
+</div>
+
+<!-- ───── Modal ───── -->
+<div class="overlay" id="overlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-full bg-blue-100 grid place-items-center text-xl">✎</div>
+      <div class="flex-1">
+        <div class="font-black text-lg">แก้ไขข้อมูลพนักงาน</div>
+        <div class="text-sm text-slate-500 mt-1">ACE056 · Peerapol Piamsri</div>
+      </div>
+    </div>
+    <div class="mt-5 space-y-3">
+      <input class="field" value="Peerapol Piamsri">
+      <select class="field"><option>DTE — Drive Test Engineer</option></select>
+    </div>
+    <div class="mt-5 flex justify-end gap-2">
+      <button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn btn-primary ripple" onclick="closeModal();toast('บันทึกแล้ว','ok')">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ───── Drawer ───── -->
+<div class="drawer-overlay" id="dovr" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+    <div class="font-black text-lg">รายละเอียดพนักงาน</div>
+    <button class="btn btn-ghost btn-icon" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="p-5 space-y-4 overflow-y-auto flex-1">
+    <div class="flex items-center gap-3">
+      <span class="avatar" style="width:56px;height:56px;font-size:18px">PP</span>
+      <div><div class="font-bold">Peerapol Piamsri</div><div class="text-xs text-slate-500">ACE056 · DTE</div></div>
+    </div>
+    <div class="card p-4 space-y-2 text-sm">
+      <div class="flex justify-between"><span class="text-slate-500">Project</span><span class="font-medium">HWT2304</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Site</span><span class="font-medium">BKK-RF-014</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Clock In</span><span class="font-medium mono">07:48</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Status</span><span class="badge b-green"><span class="dot bg-emerald-500"></span>On Site</span></div>
+    </div>
+    <div>
+      <div class="text-xs font-bold text-slate-600 mb-2">Recent activity</div>
+      <ul class="text-xs space-y-1.5 text-slate-600">
+        <li>• 07:48 — Clock In · BKK-RF-014</li>
+        <li>• 09:12 — Site visit reported</li>
+        <li>• 10:30 — Worklog saved</li>
+      </ul>
+    </div>
+  </div>
+</aside>
+
+<!-- ───── Toasts ───── -->
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+/* ─── Helpers ─── */
+function openModal(){document.getElementById('overlay').classList.add('show')}
+function closeModal(){document.getElementById('overlay').classList.remove('show')}
+function openDrawer(){document.getElementById('drawer').classList.add('show');document.getElementById('dovr').classList.add('show')}
+function closeDrawer(){document.getElementById('drawer').classList.remove('show');document.getElementById('dovr').classList.remove('show')}
+function toast(msg,type){
+  const el=document.createElement('div')
+  el.className='toast '+(type==='ok'?'toast-ok':type==='err'?'toast-err':'')
+  el.innerHTML=(type==='ok'?'✓ ':type==='err'?'✕ ':'ℹ ')+msg
+  document.getElementById('toasts').appendChild(el)
+  requestAnimationFrame(()=>el.classList.add('show'))
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),400)},2600)
+}
+
+/* Ripple position */
+document.querySelectorAll('.ripple').forEach(el=>{
+  el.addEventListener('mousedown',e=>{
+    const r=el.getBoundingClientRect()
+    el.style.setProperty('--mx',(e.clientX-r.left)+'px')
+    el.style.setProperty('--my',(e.clientY-r.top)+'px')
+  })
+})
+
+/* TOC active on scroll */
+const tocLinks=document.querySelectorAll('.toc a')
+const sections=[...document.querySelectorAll('section[id]')]
+function setActiveToc(){
+  const y=window.scrollY+120
+  let cur=sections[0].id
+  for(const s of sections){ if(s.offsetTop<=y) cur=s.id }
+  tocLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur))
+}
+window.addEventListener('scroll',setActiveToc,{passive:true}); setActiveToc()
+
+/* Counter animation */
+document.querySelectorAll('[data-counter]').forEach(el=>{
+  const target=+el.dataset.counter, dur=900, start=performance.now()
+  function step(t){
+    const p=Math.min(1,(t-start)/dur), eased=1-Math.pow(1-p,3)
+    el.textContent=Math.round(target*eased)
+    if(p<1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+})
+
+/* Progress re-animate */
+function animateProgress(){
+  const bar=document.getElementById('pg'), label=document.getElementById('pg-val')
+  bar.style.width='0%'; label.textContent='0%'
+  setTimeout(()=>{
+    const v=Math.floor(40+Math.random()*55)
+    bar.style.width=v+'%'; label.textContent=v+'%'
+  },50)
+}
+
+/* Tab switch */
+document.querySelectorAll('#tabs .tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('active'))
+  t.classList.add('active')
+  const labels=['Daily — แสดง 142 คน Clock-in วันนี้','Weekly — เฉลี่ย 138 คน/วัน','Monthly — รวม 3,124 sessions','Map — รวม 168 markers']
+  const body=document.getElementById('tab-body')
+  body.classList.remove('fade-up'); void body.offsetWidth; body.classList.add('fade-up')
+  body.textContent='เลือก '+labels[+t.dataset.tab-1]
+}))
+
+/* ───────── CHARTS ───────── */
+Chart.defaults.font.family='Inter, Sarabun, sans-serif'
+Chart.defaults.color='#475569'
+const TIP={backgroundColor:'#0f172a',padding:8,cornerRadius:6,displayColors:false,titleFont:{size:11,weight:'700'},bodyFont:{size:11}}
+
+/* LIVE LINE */
+const liveData=Array.from({length:30},(_,i)=>120+Math.round(Math.sin(i/3)*15+Math.random()*8))
+const liveChart=new Chart(document.getElementById('chLive'),{
+  type:'line',
+  data:{labels:liveData.map((_,i)=>i),datasets:[{data:liveData,borderColor:'#2447d8',backgroundColor:'rgba(36,71,216,.12)',fill:true,tension:.35,pointRadius:0,borderWidth:2.5}]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:600,easing:'easeOutCubic'},plugins:{legend:{display:false},tooltip:TIP},scales:{x:{display:false},y:{grid:{color:'#f1f5f9'},beginAtZero:false}}}
+})
+let liveOn=true
+function tick(){
+  if(!liveOn) return
+  const last=liveChart.data.datasets[0].data.at(-1)
+  const next=Math.max(80,Math.min(180,last+Math.round((Math.random()-.5)*14)))
+  liveChart.data.datasets[0].data.push(next)
+  liveChart.data.datasets[0].data.shift()
+  liveChart.update()
+}
+setInterval(tick,1500)
+function liveToggle(btn){ liveOn=!liveOn; btn.textContent=liveOn?'⏸ Pause':'▶ Resume' }
+
+/* REVENUE filter swap */
+const REV={
+  ALL:[420,480,520,610,580,640,720,690,750,820,790,860],
+  RF:[180,210,240,290,260,310,360,330,380,420,400,460],
+  TE:[140,160,170,200,190,210,240,220,250,280,260,290],
+  DTE:[100,110,110,120,130,120,120,140,120,120,130,110]
+}
+const chRev=new Chart(document.getElementById('chRev'),{
+  type:'bar',
+  data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Revenue',data:REV.ALL,backgroundColor:'#2447d8',borderRadius:6,barThickness:14,hoverBackgroundColor:'#c73b32'}]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:700,easing:'easeOutCubic'},plugins:{legend:{display:false},tooltip:TIP},scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},beginAtZero:true}}}
+})
+function filterRev(btn){
+  document.querySelectorAll('[data-acct]').forEach(b=>b.classList.remove('active'))
+  btn.classList.add('active')
+  chRev.data.datasets[0].data=REV[btn.dataset.acct]
+  chRev.update()
+}
+
+/* DONUT */
+new Chart(document.getElementById('chDonut'),{
+  type:'doughnut',
+  data:{labels:['On Site','Office','Off Site','Leave','Not Yet'],datasets:[{data:[118,24,24,5,26],backgroundColor:['#16a34a','#2447d8','#dc2626','#d97706','#cbd5e1'],borderWidth:2,borderColor:'#fff',hoverOffset:12}]},
+  options:{cutout:'62%',animation:{animateRotate:true,animateScale:true,duration:900},plugins:{legend:{position:'bottom',labels:{boxWidth:8,padding:8,font:{size:11}}},tooltip:TIP}}
+})
+
+/* ALLOC bar with slider */
+const PROJ_W=[0.32,0.22,0.18,0.14,0.08,0.06]
+const chAlloc=new Chart(document.getElementById('chAlloc'),{
+  type:'bar',
+  data:{labels:['HWT2304','HWT2604','HWT2105','HWT2208','HWT2412','Other'],datasets:[{label:'Hours',data:PROJ_W.map(w=>Math.round(600*w)),backgroundColor:['#2447d8','#3b59e0','#5e75e8','#8092ee','#a3aff4','#cbd5e1'],borderRadius:8,barThickness:30}]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},plugins:{legend:{display:false},tooltip:TIP},scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},beginAtZero:true}}}
+})
+document.getElementById('allocRange').addEventListener('input',e=>{
+  const v=+e.target.value
+  document.getElementById('allocVal').textContent=v+'h'
+  chAlloc.data.datasets[0].data=PROJ_W.map(w=>Math.round(v*w))
+  chAlloc.update()
+})
+
+/* RADAR */
+new Chart(document.getElementById('chRadar'),{
+  type:'radar',
+  data:{labels:['On-time','Quality','Coverage','Safety','Documentation','Customer'],datasets:[
+    {label:'Actual',data:[92,85,88,95,78,90],backgroundColor:'rgba(36,71,216,.2)',borderColor:'#2447d8',borderWidth:2,pointBackgroundColor:'#2447d8'},
+    {label:'Target',data:[90,90,85,90,85,90],backgroundColor:'rgba(199,59,50,.05)',borderColor:'#c73b32',borderWidth:1.5,borderDash:[5,4],pointRadius:0}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:900},plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}},tooltip:TIP},scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:25,backdropColor:'transparent',font:{size:10}},grid:{color:'#e2e8f0'},angleLines:{color:'#e2e8f0'}}}}
+})
+
+/* STACKED AREA */
+new Chart(document.getElementById('chArea'),{
+  type:'line',
+  data:{labels:Array.from({length:30},(_,i)=>i+1),datasets:[
+    {label:'On Site',data:Array.from({length:30},(_,i)=>110+Math.round(Math.sin(i/4)*12+Math.random()*10)),backgroundColor:'rgba(22,163,74,.7)',borderWidth:0,fill:true,pointRadius:0,tension:.35,stack:'a'},
+    {label:'Office',data:Array.from({length:30},()=>20+Math.round(Math.random()*10)),backgroundColor:'rgba(36,71,216,.7)',borderWidth:0,fill:true,pointRadius:0,tension:.35,stack:'a'},
+    {label:'Off Site',data:Array.from({length:30},()=>16+Math.round(Math.random()*10)),backgroundColor:'rgba(220,38,38,.65)',borderWidth:0,fill:true,pointRadius:0,tension:.35,stack:'a'}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:900},plugins:{legend:{position:'top',align:'end',labels:{boxWidth:10,font:{size:11}}},tooltip:TIP},scales:{x:{grid:{display:false}},y:{stacked:true,grid:{color:'#f1f5f9'},beginAtZero:true}}}
+})
+
+/* GAUGE */
+const gArc=document.getElementById('gaugeArc'), gNd=document.getElementById('gaugeNeedle'), gVal=document.getElementById('gaugeVal')
+function setGauge(v){
+  const off=220-(v/100)*220
+  gArc.style.strokeDashoffset=off
+  gNd.setAttribute('transform',`rotate(${-90+v*1.8} 80 80)`)
+  // animate counter
+  const cur=+gVal.textContent.replace('%','')||0, start=performance.now(), dur=600
+  function step(t){const p=Math.min(1,(t-start)/dur);gVal.textContent=Math.round(cur+(v-cur)*(1-Math.pow(1-p,3)))+'%';if(p<1)requestAnimationFrame(step)}
+  requestAnimationFrame(step)
+}
+document.getElementById('gaugeRange').addEventListener('input',e=>setGauge(+e.target.value))
+setTimeout(()=>setGauge(83),300)
+
+/* HEATMAP */
+const hm=document.getElementById('heatmap')
+const colors=['#eef2f7','#dbeafe','#bfdbfe','#93c5fd','#60a5fa','#3b82f6','#2563eb','#1e40af']
+for(let w=0;w<13;w++){
+  const col=document.createElement('div'); col.className='flex flex-col gap-1'
+  for(let d=0;d<7;d++){
+    const v=Math.floor(Math.random()*colors.length)
+    const c=document.createElement('div'); c.className='hm-cell'; c.style.background=colors[v]; c.title=`week ${w+1} · day ${d+1} · ${v*20} clock-ins`
+    col.appendChild(c)
+  }
+  hm.appendChild(col)
+}
+
+/* SPARKLINES */
+const sparkGrid=document.getElementById('sparkGrid')
+const PROJECTS=['HWT2304','HWT2604','HWT2105','HWT2208','HWT2412','HWT2701','HWT2808','HWT2920','HWT3001','HWT3102']
+PROJECTS.forEach((p,i)=>{
+  const id='sp'+i
+  const trend=(Math.random()-.5)>0
+  sparkGrid.insertAdjacentHTML('beforeend',`<div><div class="flex justify-between text-xs mb-1"><span class="font-bold mono">${p}</span><span class="${trend?'text-emerald-600':'text-red-600'} font-bold mono">${trend?'↑':'↓'} ${Math.floor(Math.random()*20+2)}%</span></div><div style="height:36px"><canvas id="${id}"></canvas></div></div>`)
+  setTimeout(()=>{
+    new Chart(document.getElementById(id),{type:'line',data:{labels:Array(14).fill(''),datasets:[{data:Array.from({length:14},()=>20+Math.random()*60),borderColor:trend?'#16a34a':'#dc2626',borderWidth:1.8,fill:true,backgroundColor:trend?'rgba(22,163,74,.12)':'rgba(220,38,38,.1)',tension:.35,pointRadius:0}]},options:{plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}},maintainAspectRatio:false,animation:{duration:700+i*60}}})
+  },0)
+})
+
+/* MAP */
+const map=L.map('leafmap',{zoomControl:true}).setView([13.7563,100.5018],10)
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(map)
+const PINS=[
+  {lat:13.7563,lng:100.5018,name:'BKK-RF-014',status:'on'},
+  {lat:13.7300,lng:100.5230,name:'BKK-RF-022',status:'on'},
+  {lat:13.7800,lng:100.4900,name:'BKK-RF-007',status:'off'},
+  {lat:13.7100,lng:100.5400,name:'BKK-RF-031',status:'office'},
+  {lat:13.8000,lng:100.5500,name:'BKK-RF-040',status:'on'},
+]
+PINS.forEach(p=>{
+  const color=p.status==='on'?'#16a34a':p.status==='off'?'#dc2626':'#2447d8'
+  L.circleMarker([p.lat,p.lng],{radius:9,color,fillColor:color,fillOpacity:.85,weight:2}).addTo(map).bindPopup(`<b>${p.name}</b><br>status: ${p.status}`)
+})
+
+/* Number flip */
+function flipNum(){
+  const el=document.getElementById('flip')
+  const n=Math.floor(80+Math.random()*120)
+  el.style.transition='transform .25s, opacity .25s'
+  el.style.transform='translateY(-8px)'; el.style.opacity='0'
+  setTimeout(()=>{el.textContent=n;el.style.transform='translateY(8px)';requestAnimationFrame(()=>{el.style.transform='translateY(0)';el.style.opacity='1'})},220)
+}
+</script>
+</body>
+</html>

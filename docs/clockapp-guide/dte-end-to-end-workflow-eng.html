@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACE Workflow DTE Per-Site</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9eef5; font-family: "Segoe UI", Tahoma, sans-serif; color: #0f172a; }
+    .poster {
+      width: 1240px; height: 1754px; margin: 0 auto; overflow: hidden;
+      padding: 38px 54px 34px;
+      background:
+        radial-gradient(circle at 7% 8%, rgba(36,71,216,.16), transparent 28%),
+        radial-gradient(circle at 92% 4%, rgba(191,48,64,.16), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    }
+    .hero {
+      position: relative; border-radius: 28px; padding: 28px 38px; color: #fff;
+      background: linear-gradient(135deg, #2447d8 0%, #70328d 48%, #c0392b 100%);
+      box-shadow: 0 22px 60px rgba(36,71,216,.22);
+    }
+    .kicker { display: inline-flex; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,.16); font-size: 19px; font-weight: 850; }
+    h1 { margin: 16px 0 8px; max-width: 760px; font-size: 46px; line-height: 1.05; letter-spacing: -1px; }
+    .subtitle { max-width: 750px; font-size: 23px; line-height: 1.42; color: rgba(255,255,255,.9); font-weight: 650; }
+    .hero-note {
+      position: absolute; right: 34px; top: 30px; width: 250px; border-radius: 22px;
+      background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.26); padding: 18px;
+    }
+    .hero-note b { display: block; font-size: 21px; margin-bottom: 8px; }
+    .hero-note span { display: block; font-size: 15px; line-height: 1.35; color: rgba(255,255,255,.86); font-weight: 720; }
+    .section-title { display: flex; justify-content: space-between; align-items: end; margin: 24px 4px 14px; }
+    .section-title h2 { margin: 0; font-size: 31px; letter-spacing: -.4px; }
+    .section-title p { margin: 0; color: #64748b; font-size: 17px; font-weight: 750; }
+    .main-flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-items: stretch; }
+    .flow-card {
+      min-height: 238px; border-radius: 20px; background: #fff; border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 38px rgba(15,23,42,.08); padding: 15px 14px; position: relative;
+    }
+    .num {
+      width: 36px; height: 36px; border-radius: 12px; background: #2447d8; color: white;
+      display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 950; margin-bottom: 10px;
+    }
+    .flow-card h3 { margin: 0 0 8px; font-size: 18px; line-height: 1.15; }
+    .flow-card p { margin: 0; color: #475569; font-size: 13.7px; line-height: 1.36; font-weight: 700; }
+    .role { margin-top: 10px; display: inline-flex; border-radius: 999px; background: #eef2ff; color: #2447d8; padding: 5px 8px; font-size: 11px; font-weight: 950; }
+    .arrow {
+      position: absolute; right: -12px; top: 104px; z-index: 2; width: 24px; height: 24px; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #cbd5e1; color: #64748b; font-weight: 950;
+    }
+    .flow-card:last-child .arrow { display: none; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .panel {
+      border-radius: 24px; background: #fff; border: 1px solid #dfe6f0;
+      box-shadow: 0 18px 46px rgba(15,23,42,.09); padding: 20px 22px;
+    }
+    .panel h3 { margin: 0 0 14px; font-size: 25px; }
+    .swim { display: grid; gap: 9px; }
+    .swim-row { display: grid; grid-template-columns: 118px 1fr; gap: 10px; align-items: center; }
+    .lane-name { border-radius: 12px; padding: 9px 10px; background: #eef2ff; color: #2447d8; font-size: 13px; line-height: 1.2; font-weight: 950; text-align: center; }
+    .lane-steps { display: flex; align-items: center; gap: 5px; min-width: 0; }
+    .step {
+      min-width: 76px; border-radius: 12px; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155;
+      padding: 8px 7px; text-align: center; font-size: 11px; line-height: 1.14; font-weight: 950;
+    }
+    .blue { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+    .green { background: #ecfdf5; border-color: #86efac; color: #166534; }
+    .amber { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .purple { background: #f3e8ff; border-color: #d8b4fe; color: #6b21a8; }
+    .red { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+    .arr { color: #94a3b8; font-weight: 950; }
+    .rule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .rule { border-radius: 18px; border: 1px dashed #cbd5e1; background: #f8fafc; padding: 14px; }
+    .rule b { display: block; font-size: 18px; margin-bottom: 6px; }
+    .rule span { display: block; color: #475569; font-size: 14.5px; line-height: 1.36; font-weight: 700; }
+    .status-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 18px; }
+    .status {
+      min-height: 98px; border-radius: 18px; padding: 12px; text-align: center; background: #fff;
+      border: 1px solid #dfe6f0; box-shadow: 0 12px 30px rgba(15,23,42,.06);
+    }
+    .dot { width: 20px; height: 20px; border-radius: 999px; margin: 0 auto 8px; }
+    .d1 { background:#7c3aed; } .d2 { background:#059669; } .d3 { background:#16a34a; } .d4 { background:#15803d; }
+    .d5 { background:#2447d8; } .d6 { background:#9a3412; } .d7 { background:#64748b; }
+    .status b { display:block; font-size: 13px; line-height: 1.15; }
+    .status span { display:block; margin-top:4px; color:#64748b; font-size:11.5px; line-height:1.22; font-weight:700; }
+    .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .note ul { margin: 0; padding-left: 23px; color: #334155; font-size: 16.5px; line-height: 1.42; font-weight: 690; }
+    .contact-band {
+      margin-top: 18px; display: grid; grid-template-columns: 1fr 165px; gap: 18px; align-items: center;
+      border-radius: 22px; background: #fff; border: 1px solid #dfe6f0; box-shadow: 0 16px 40px rgba(15,23,42,.07); padding: 18px 24px;
+    }
+    .contact-band h3 { margin: 0 0 8px; font-size: 24px; }
+    .contact-band p { margin: 0; color: #475569; font-size: 17px; line-height: 1.42; font-weight: 720; }
+    .pill-row { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .pill { border-radius: 999px; background: #eef2ff; color: #2447d8; padding: 7px 12px; font-size: 14px; font-weight: 900; }
+    .qr { justify-self: end; width: 130px; height: 130px; border-radius: 16px; border: 8px solid #fff; box-shadow: 0 12px 26px rgba(15,23,42,.16); background: #fff; }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <section class="hero">
+      <div class="kicker">ACE SYSTEM | Workflow DTE Per-Site</div>
+      <h1>Workflow DTE Per-Site</h1>
+      <div class="subtitle">Receive assigned site → Clock App PER_SITE → Start / End Site → Upload Report → Wait for Approval / Payment</div>
+    </section>
+
+    <div class="section-title">
+      <h2>Main Workflow Overview</h2>
+      <p>Steps the DTE needs to complete</p>
+    </div>
+    <section class="main-flow">
+      <div class="flow-card"><div class="num">1</div><h3>Assigned Site</h3><p>After PM plans the job, the assigned site appears in ClockApp for the responsible DTE.</p><span class="role">Assigned Site</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">2</div><h3>Clock App</h3><p>DTE opens the workday, then selects the assigned site to work in PER_SITE mode.</p><span class="role">DTE</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">3</div><h3>Start / End Site</h3><p>Tap Start Site before field work and End Site as COMPLETE when the site work is finished.</p><span class="role">DTE</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">4</div><h3>Upload Report</h3><p>Upload the .rar report after the site reaches DT_DONE. The system advances it to REPORT_DONE.</p><span class="role">DTE</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">5</div><h3>Approval / Payment</h3><p>The team checks the work. Check Pass promotes it to ACE_APPROVED and sends it to payment.</p><span class="role">Status</span></div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h3>Status Flow Across Pages</h3>
+        <div class="swim">
+          <div class="swim-row"><div class="lane-name">Assigned</div><div class="lane-steps"><span class="step green">Planned</span><span class="arr">→</span><span class="step blue">Site appears</span></div></div>
+          <div class="swim-row"><div class="lane-name">Clock App</div><div class="lane-steps"><span class="step blue">Start Site</span><span class="arr">→</span><span class="step amber">In Progress</span><span class="arr">→</span><span class="step green">End Complete</span></div></div>
+          <div class="swim-row"><div class="lane-name">Pre-Site</div><div class="lane-steps"><span class="step blue">DT Started</span><span class="arr">→</span><span class="step green">DT Done</span><span class="arr">→</span><span class="step purple">Report Done</span><span class="arr">→</span><span class="step green">ACE Approved</span></div></div>
+          <div class="swim-row"><div class="lane-name">Payment</div><div class="lane-steps"><span class="step red">Ready to Pay</span><span class="arr">→</span><span class="step green">Paid</span></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Critical Workflow Rules</h3>
+        <div class="rule-grid">
+          <div class="rule"><b>Site must be assigned first</b><span>If the site is missing in ClockApp, ask PM to check the DTE plan or PER_SITE access.</span></div>
+          <div class="rule"><b>Clock Out must be COMPLETE</b><span>Only outcome = COMPLETE promotes Pre-Site to DT_DONE. STOP/ISSUE does not auto-promote.</span></div>
+          <div class="rule"><b>Report must be .rar</b><span>Report Upload accepts .rar only, max 500MB, and advances DT_DONE to REPORT_DONE.</span></div>
+          <div class="rule"><b>Check Pass before payment</b><span>Ready to Pay in DTE Payments comes from current_stage = ACE_APPROVED and not yet Paid.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="status-grid">
+      <div class="status"><div class="dot d1"></div><b>PENDING SITE MAP</b><span>Waiting site / project map</span></div>
+      <div class="status"><div class="dot d2"></div><b>PLANNED</b><span>DTE has been planned</span></div>
+      <div class="status"><div class="dot d3"></div><b>IN PROGRESS</b><span>DTE is working</span></div>
+      <div class="status"><div class="dot d4"></div><b>WORK / DT DONE</b><span>Clock completed</span></div>
+      <div class="status"><div class="dot d5"></div><b>REPORT DONE</b><span>Report uploaded</span></div>
+      <div class="status"><div class="dot d6"></div><b>ACE APPROVED</b><span>Ready to Pay</span></div>
+      <div class="status"><div class="dot d7"></div><b>DTE PAID</b><span>Payment completed</span></div>
+    </section>
+
+    <section class="bottom-grid">
+      <div class="panel note">
+        <h3>Roles and Responsibilities</h3>
+        <ul>
+          <li><b>PM / Project:</b> Assign sites to DTE, monitor Pre-Site, check Pass/Fail</li>
+          <li><b>DTE:</b> Clock PER_SITE on the correct site, End Site as COMPLETE, upload .rar report</li>
+          <li><b>System:</b> Sync sites into ClockApp, auto-promote stages, calculate payment</li>
+        </ul>
+      </div>
+      <div class="panel note">
+        <h3>Payment Checklist</h3>
+        <ul>
+          <li>Site is planned to a DTE and has a completed Clock session</li>
+          <li>Pre-Site is REPORT_DONE, report is attached, and Check Pass has promoted it to ACE_APPROVED</li>
+          <li>If Check Fail occurs, revise the work/report as instructed by PM</li>
+          <li>After payment, the status shows as DTE PAID</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="contact-band">
+      <div>
+        <h3>Main Access Links</h3>
+        <p>ClockApp: https://ace.airconnect-e.com/ClockApp · Report Upload: /project/report-upload</p>
+        <p>Pre-Site Status: /project/presite-monitor · Payment Status: /finance/dte-payments</p>
+        <p>Designed by and contact: Peerapol Pianmsri</p>
+        <div class="pill-row"><span class="pill">A4 Infographic</span><span class="pill">English Version</span><span class="pill">Updated 2026-06-04</span></div>
+      </div>
+      <img class="qr" alt="QR Code to ClockApp" src="clockapp-qr.png" />
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACE ClockApp - Leave Request</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #e9eef5;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: #0f172a;
+    }
+    .poster {
+      width: 1240px;
+      height: 1754px;
+      margin: 0 auto;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 7% 8%, rgba(36,71,216,.16), transparent 28%),
+        radial-gradient(circle at 92% 4%, rgba(191,48,64,.16), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+      padding: 36px 54px 36px;
+    }
+    .hero {
+      border-radius: 28px;
+      padding: 26px 38px;
+      color: #fff;
+      background: linear-gradient(135deg, #2447d8 0%, #70328d 48%, #c0392b 100%);
+      box-shadow: 0 22px 60px rgba(36,71,216,.22);
+    }
+    .kicker {
+      display: inline-flex;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      font-size: 19px;
+      font-weight: 850;
+    }
+    h1 {
+      margin: 16px 0 8px;
+      font-size: 50px;
+      line-height: 1.05;
+      letter-spacing: -1px;
+    }
+    .subtitle {
+      font-size: 23px;
+      line-height: 1.45;
+      color: rgba(255,255,255,.9);
+      font-weight: 650;
+      max-width: 980px;
+    }
+    .flow {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .card {
+      min-height: 560px;
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 18px 46px rgba(15,23,42,.09);
+      overflow: hidden;
+    }
+    .card-head {
+      min-height: 164px;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #edf6f3;
+    }
+    .step {
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      background: #2447d8;
+      color: #fff;
+      font-size: 23px;
+      font-weight: 950;
+      margin-bottom: 10px;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 23px;
+      line-height: 1.15;
+    }
+    .card p {
+      margin: 0;
+      color: #64748b;
+      font-size: 16px;
+      line-height: 1.38;
+      font-weight: 650;
+    }
+    .phone-wrap {
+      height: 396px;
+      display: flex;
+      align-items: start;
+      justify-content: center;
+      padding: 16px;
+      background: linear-gradient(180deg, #f8fafc, #eef2f7);
+    }
+    .phone {
+      width: 168px;
+      height: 366px;
+      border-radius: 24px;
+      object-fit: cover;
+      object-position: top center;
+      border: 7px solid #111827;
+      box-shadow: 0 16px 36px rgba(15,23,42,.24);
+      background: #111827;
+    }
+    .phone.mid { object-position: center center; }
+    .note-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 18px;
+    }
+    .note {
+      border-radius: 22px;
+      padding: 18px 24px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 40px rgba(15,23,42,.07);
+    }
+    .note h3 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+    .note ul {
+      margin: 0;
+      padding-left: 24px;
+      color: #334155;
+      font-size: 18px;
+      line-height: 1.4;
+      font-weight: 650;
+    }
+    .info-grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .info-panel {
+      padding: 16px 22px;
+      border-radius: 18px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      color: #475569;
+      font-size: 16px;
+      line-height: 1.42;
+      font-weight: 700;
+    }
+    .info-panel h3 {
+      margin: 0 0 10px;
+      color: #0f172a;
+      font-size: 22px;
+    }
+    .request-panel {
+      padding: 10px 18px 12px;
+      position: relative;
+    }
+    .request-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: start;
+      gap: 14px;
+      margin-bottom: 6px;
+    }
+    .auto-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: #355b24;
+      font-size: 24px;
+      font-weight: 950;
+      line-height: 1;
+    }
+    .auto-title::before,
+    .auto-title::after {
+      content: "";
+      height: 6px;
+      flex: 1;
+      min-width: 110px;
+      background: #4f7f35;
+    }
+    .legend {
+      min-width: 150px;
+      border-radius: 12px;
+      background: #e5e7eb;
+      padding: 6px 10px;
+      color: #111827;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .legend-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 5px solid #355b24;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
+      text-decoration: underline;
+    }
+    .legend div:not(.legend-title) { margin-top: 2px; }
+    .approve { color: #355b24; }
+    .reject { color: #ef1010; }
+    .ack { color: #0ea5e9; }
+    .email-board {
+      position: relative;
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 10px;
+      border: 2px dashed #b9dca8;
+      border-radius: 18px;
+      padding: 10px 14px 10px 0;
+      background: rgba(255,255,255,.55);
+    }
+    .board-left {
+      padding-top: 50px;
+      font-size: 18px;
+      color: #0f172a;
+      font-weight: 950;
+    }
+    .board-left .label-title {
+      text-decoration: underline;
+      margin-bottom: 9px;
+    }
+    .leave-row-label {
+      height: 31px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+    .leave-row-label span:first-child {
+      font-size: 24px;
+      line-height: 1;
+    }
+    .board-main {
+      display: grid;
+      grid-template-columns: 1fr 88px;
+      gap: 8px;
+    }
+    .actors {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-bottom: 10px;
+      padding-right: 8px;
+    }
+    .actor {
+      border-radius: 9px;
+      background: #e2f0da;
+      box-shadow: 5px 8px 12px rgba(15,23,42,.22);
+      color: #0f172a;
+      font-size: 20px;
+      font-weight: 850;
+      text-align: center;
+      padding: 10px 8px;
+    }
+    .actor.boss {
+      background: #ffd966;
+    }
+    .flow-lines {
+      display: grid;
+      gap: 5px;
+      padding-top: 1px;
+    }
+    .flow-line {
+      position: relative;
+      height: 26px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+      padding-right: 8px;
+    }
+    .flow-line::before,
+    .flow-line::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 8px;
+      top: 12px;
+      height: 6px;
+      background: #d9d9d9;
+      z-index: 0;
+    }
+    .flow-line::after {
+      right: var(--approve-end);
+      background: #355b24;
+    }
+    .flow-line.sick::after { --approve-end: 60%; }
+    .flow-line.personal::after { --approve-end: 40%; }
+    .flow-line.annual::after,
+    .flow-line.other::after { --approve-end: 40%; }
+    .dot {
+      width: 21px;
+      height: 21px;
+      border-radius: 999px;
+      justify-self: center;
+      position: relative;
+      z-index: 1;
+      background: #d9d9d9;
+    }
+    .dot.approve-dot { background: #355b24; }
+    .dot.ack-dot { background: #0ea5e9; }
+    .summary {
+      border: 2px dashed #0ea5e9;
+      border-radius: 10px;
+      padding: 8px 6px;
+      text-align: center;
+      color: #0ea5e9;
+      font-size: 15px;
+      line-height: 1.05;
+      font-weight: 950;
+    }
+    .summary .boss-box {
+      margin-top: 30px;
+      border-radius: 9px;
+      background: #ffd966;
+      box-shadow: 5px 8px 12px rgba(15,23,42,.22);
+      color: #0f172a;
+      font-size: 19px;
+      padding: 10px 4px;
+    }
+    .contact-band {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr 190px;
+      gap: 18px;
+      align-items: center;
+      border-radius: 22px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 40px rgba(15,23,42,.07);
+      padding: 16px 24px;
+    }
+    .contact-band h3 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+    .contact-band p {
+      margin: 0;
+      color: #475569;
+      font-size: 17px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+    .contact-meta {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #2447d8;
+      padding: 7px 12px;
+      font-size: 14.5px;
+      font-weight: 900;
+    }
+    .qr-box {
+      justify-self: end;
+      text-align: center;
+    }
+    .qr-box img {
+      width: 132px;
+      height: 132px;
+      border-radius: 16px;
+      border: 8px solid #f8fafc;
+      box-shadow: 0 10px 24px rgba(15,23,42,.12);
+      background: #fff;
+    }
+    .qr-box div {
+      margin-top: 8px;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .footer {
+      margin-top: 18px;
+      padding: 20px 30px;
+      border-radius: 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #111827;
+      color: #e5e7eb;
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .badge {
+      color: #fff;
+      background: #16a34a;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 18px;
+      font-weight: 900;
+    }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <section class="hero">
+      <div class="kicker">ACE ClockApp คู่มือใช้งาน</div>
+      <h1>Leave Request</h1>
+      <div class="subtitle">
+        สำหรับยื่นคำขอลา ตรวจสถิติวันลา ติดตามสถานะคำขอ และดูเงื่อนไขการลาในหน้า Leave
+      </div>
+    </section>
+
+    <section class="flow">
+      <article class="card">
+        <div class="card-head">
+          <div class="step">1</div>
+          <h3>กรอกคำขอลา</h3>
+          <p>เลือกประเภทลา วันที่เริ่ม-สิ้นสุด ระบุเหตุผล และตรวจจำนวนวันก่อนกด Submit Request</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone" src="leave-01-submit-form.png" alt="Leave request submit form">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">2</div>
+          <h3>ตรวจสรุปและสถิติ</h3>
+          <p>ดู Request Summary, Leave Statistics และ Process Flow เพื่อเข้าใจลำดับอนุมัติ</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone mid" src="leave-02-statistics-flow.png" alt="Leave statistics and process flow">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">3</div>
+          <h3>ติดตามสถานะคำขอ</h3>
+          <p>ตรวจ My Leave Requests, สถานะ Pending / Approved / Rejected และดู Leave Rules</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone mid" src="leave-03-requests-rules.png" alt="My leave requests and leave rules">
+        </div>
+      </article>
+    </section>
+
+    <section class="note-grid">
+      <div class="note">
+        <h3>ขั้นตอนใช้งาน Leave</h3>
+        <ul>
+          <li>Login เข้า ClockApp แล้วเปิดแท็บ Leave</li>
+          <li>เลือก Leave Type ให้ตรงกับเหตุผลการลา</li>
+          <li>เลือก Start Date และ End Date ให้ถูกต้อง</li>
+          <li>กรอก Reason ให้ชัดเจนเพื่อให้หัวหน้าอนุมัติได้เร็ว</li>
+          <li>ตรวจ Total Days แล้วกด Submit Request</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>หลังยื่นคำขอ</h3>
+        <ul>
+          <li>ตรวจคำขอใน My Leave Requests</li>
+          <li>ใช้ Refresh เมื่อต้องการอัปเดตสถานะล่าสุด</li>
+          <li>หากคำขอยัง Pending ให้รอหัวหน้างานพิจารณา</li>
+          <li>ตรวจ Leave Statistics เพื่อดูจำนวนวันที่ใช้ไป</li>
+          <li>อ่าน Leave Rules ก่อนยื่นคำขอครั้งถัดไป</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="info-grid">
+      <div class="info-panel request-panel">
+        <div class="request-head">
+          <div class="auto-title">Automatic Email</div>
+          <div class="legend">
+            <div class="legend-title"><span>Status</span><span></span></div>
+            <div class="approve">- Approve</div>
+            <div class="reject">- Reject</div>
+            <div class="ack">- Acknowledge</div>
+          </div>
+        </div>
+
+        <div class="email-board">
+          <div class="board-left">
+            <div class="label-title">Leave</div>
+            <div class="leave-row-label"><span>•</span><span>Sick Leave</span></div>
+            <div class="leave-row-label"><span>•</span><span>Personal Leave</span></div>
+            <div class="leave-row-label"><span>•</span><span>Annual Leave</span></div>
+            <div class="leave-row-label"><span>•</span><span>Other Leave</span></div>
+          </div>
+
+          <div class="board-main">
+            <div>
+              <div class="actors">
+                <div class="actor">Employee</div>
+                <div class="actor">PM</div>
+                <div class="actor">PD</div>
+                <div class="actor">HR</div>
+                <div class="actor boss">Boss</div>
+              </div>
+              <div class="flow-lines">
+                <div class="flow-line sick">
+                  <span class="dot approve-dot"></span>
+                  <span class="dot approve-dot"></span>
+                  <span class="dot"></span>
+                  <span class="dot ack-dot"></span>
+                  <span class="dot ack-dot"></span>
+                </div>
+                <div class="flow-line personal">
+                  <span class="dot approve-dot"></span>
+                  <span class="dot approve-dot"></span>
+                  <span class="dot approve-dot"></span>
+                  <span class="dot ack-dot"></span>
+                  <span class="dot ack-dot"></span>
+                </div>
+                <div class="flow-line annual">
+                  <span class="dot approve-dot"></span>
+                  <span class="dot approve-dot"></span>
+                  <span class="dot approve-dot"></span>
+                  <span class="dot ack-dot"></span>
+                  <span class="dot ack-dot"></span>
+                </div>
+                <div class="flow-line other">
+                  <span class="dot approve-dot"></span>
+                  <span class="dot approve-dot"></span>
+                  <span class="dot approve-dot"></span>
+                  <span class="dot ack-dot"></span>
+                  <span class="dot ack-dot"></span>
+                </div>
+              </div>
+            </div>
+            <div class="summary">
+              Summary<br>Report
+              <div class="boss-box">Boss</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="contact-band">
+      <div>
+        <h3>สแกนเพื่อเข้าใช้งาน ClockApp</h3>
+        <p>เปิดผ่านมือถือเพื่อยื่นคำขอลา ตรวจสถานะ และดูสถิติวันลาได้สะดวก</p>
+        <div class="contact-meta">
+          <span class="pill">ผู้ออกแบบ / ติดต่อ: Peerapol Pianmsri</span>
+          <span class="pill">Link: ace.airconnect-e.com/ClockApp</span>
+          <span class="pill">อัปเดต: 2026-06-02</span>
+        </div>
+      </div>
+      <div class="qr-box">
+        <img src="clockapp-qr.png" alt="QR Code for ACE ClockApp">
+        <div>Scan QR</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Airconnect Engineering (Thailand) Co., Ltd. | ACE Clock System 2.0</span>
+      <span class="badge">Leave Guide</span>
+    </footer>
+  </main>
+</body>
+</html>
+
+

@@ -1,0 +1,52 @@
+# ---- Secrets (ห้าม commit เด็ดขาด) ----
+.env
+.env.*
+!.env.example
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Node / Frontend build ----
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+*.log
+
+# ---- Runtime / data (ไม่ใช่ source) ----
+photos/
+backups/
+reports/
+_sync_backups/
+
+# ---- Browser automation scratch dirs ----
+.chrome-*/
+
+# ---- Heavy office documents (ไม่เก็บใน git) ----
+*.xlsx
+*.xlsm
+*.xls
+*.pdf
+*.pptx
+*.docx
+*.rar
+*.zip
+*.7z
+Finance/ตัวอย่างเอกสาร/
+Finance/Upload for payment*/
+Finance/Expense of Project/
+Finance/New folder/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

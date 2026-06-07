@@ -1,0 +1,677 @@
+[
+  {
+    "email": "prasittiponp8@gmail.com",
+    "name": "Prasittipon Ployphum",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "ananchai.mittha@gmail.com",
+    "name": "Ananchai Mittha",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "phumipat38@gmail.com",
+    "name": "Phumipat Yupracham",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "NBTC2501",
+    "project_name": "NBTC2501 : NBTC NSA/SA Benchmarking Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "jatsada8299@gmail.com",
+    "name": "Chetsada Thauaonsang",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "kan.nattharinee@gmail.com",
+    "name": "Nattharinee Karncharngad",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "thachatham2xl@gmail.com",
+    "name": "Thachatham Monton",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2304",
+    "project_name": "HWT2304 : RF TRUE Merge/HWT_Rollout EAS Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "natdanai.ace@gmail.com",
+    "name": "Natdanai Kullapat",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2304",
+    "project_name": "HWT2304 : RF TRUE Merge/HWT_Rollout EAS Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "fruittychamp@gmail.com",
+    "name": "Kidsakon Deeprasert",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "panut42@gmail.com",
+    "name": "Panut Pang-nga",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "ZTE2301",
+    "project_name": "ZTE2301 : RF TRUE Merge/ZTE_Rollout South Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "seinxfrei@gmail.com",
+    "name": "Kotchakorn Rattanamongkol",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "skangkan@gmail.com",
+    "name": "Sajja Kaengkan",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "atthapol.bom@gmail.com",
+    "name": "Atthapol Ruangboot",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "Project",
+    "project_name": "Project Management",
+    "position": "Senior Project Manager"
+  },
+  {
+    "email": "peerapol1430@gmail.com",
+    "name": "Peerapol Piamsri",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "NBTC2501",
+    "project_name": "NBTC2501 : NBTC NSA/SA Benchmarking Project",
+    "position": "Project Manager"
+  },
+  {
+    "email": "hs3pol@gmail.com",
+    "name": "Thanachai Mothong",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2306",
+    "project_name": "HWT2306 : RF NPM Package TRUE Merge EAS Project",
+    "position": "Rigger"
+  },
+  {
+    "email": "arohababeeron@gmail.com",
+    "name": "Sukreephon Maichum",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "OMC Engineer"
+  },
+  {
+    "email": "krittiyapornh.huawei@gmail.com",
+    "name": "Krittiyaporn Homchan",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Report Preparation Engineer"
+  },
+  {
+    "email": "metineeb.huawei@gmail.com",
+    "name": "Metinee Boonkerd",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Report Preparation Engineer"
+  },
+  {
+    "email": "kwangdawtb@gmail.com",
+    "name": "Tipparat Buntaweelert",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "Project",
+    "project_name": "Project Management",
+    "position": "RF Project Admin"
+  },
+  {
+    "email": "sc.acoustic@gmail.com",
+    "name": "Krittasin Duangta",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Project Manager"
+  },
+  {
+    "email": "stnptslk@gmail.com",
+    "name": "Sutinee Pruttisalikorn",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2306",
+    "project_name": "HWT2306 : RF NPM Package TRUE Merge EAS Project",
+    "position": "OSS Engineer"
+  },
+  {
+    "email": "yodsaweek.huawei@gmail.com",
+    "name": "Yodsawee Khawsri",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Team Leader"
+  },
+  {
+    "email": "woraphatc.huawei@gmail.com",
+    "name": "Woraphat Chery",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2304",
+    "project_name": "HWT2304 : RF TRUE Merge/HWT_Rollout EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "kridsana2537za@gmail.com",
+    "name": "Kridsana petcharakan",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "paw.rmuti@gmail.com",
+    "name": "Sujitra Khuenkhiao",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Report Preparation Engineer"
+  },
+  {
+    "email": "watcharaboonthai1992@gmail.com",
+    "name": "Wachara Boonthai",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "NBTC2501",
+    "project_name": "NBTC2501 : NBTC NSA/SA Benchmarking Project",
+    "position": "Report Preparation Engineer"
+  },
+  {
+    "email": "bandasaksukpheng@gmail.com",
+    "name": "Bandasak Sukpheng",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "Project",
+    "project_name": "Project Management",
+    "position": "Senior Site Supervisor"
+  },
+  {
+    "email": "mean0607@gmail.com",
+    "name": "Artit Malawaichan",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "Project",
+    "project_name": "Project Management",
+    "position": "Senior Systems Engineer"
+  },
+  {
+    "email": "au23032537@gmail.com",
+    "name": "Boonsong Nisap",
+    "section": "Enterprise Project",
+    "team": "Other",
+    "project_code": "WW2503",
+    "project_name": "WW2503 : WW Orange Line Project",
+    "position": "Site Solution"
+  },
+  {
+    "email": "k.chainarong.songsee@gmail.com",
+    "name": "Chainarong Songsee",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "HWT2502",
+    "project_name": "HWT2502 : TE AIS MBB Expansion BMA Project",
+    "position": "Site Supervisor"
+  },
+  {
+    "email": "bluepeerayu@gmail.com",
+    "name": "Peerayu Chunlaphan",
+    "section": "Enterprise Project",
+    "team": "Other",
+    "project_code": "WW2503",
+    "project_name": "WW2503 : WW Orange Line Project",
+    "position": "Site Engineer"
+  },
+  {
+    "email": "bangvela@gmail.com",
+    "name": "Wathana Lamoon",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "Project",
+    "project_name": "Project Management",
+    "position": "Senior Project Manager"
+  },
+  {
+    "email": "janny2362000@gmail.com",
+    "name": "Chonnikan Angsuwannason",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "Project",
+    "project_name": "Project Management",
+    "position": "Cost Analysis"
+  },
+  {
+    "email": "zechange@gmail.com",
+    "name": "Packaphon Maythamongkolkate",
+    "section": "Enterprise Project",
+    "team": "Other",
+    "project_code": "WW2503",
+    "project_name": "WW2503 : WW Orange Line Project",
+    "position": "Site Supervisor"
+  },
+  {
+    "email": "s.nattapon1989@gmail.com",
+    "name": "Nattapon Sangtienprapai",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "HWT2305",
+    "project_name": "HWT2305 : TE TRUE Merge/HWT_Rollout BMA Project",
+    "position": "Project Manager"
+  },
+  {
+    "email": "tom1995mot65@gmail.com",
+    "name": "Akkarawut Promriew",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "HWT2305",
+    "project_name": "HWT2305 : TE TRUE Merge/HWT_Rollout BMA Project",
+    "position": "Driver"
+  },
+  {
+    "email": "puksirikh@gmail.com",
+    "name": "Paksiri Khattiset",
+    "section": "Enterprise Project",
+    "team": "Other",
+    "project_code": "WW2503",
+    "project_name": "WW2503 : WW Orange Line Project",
+    "position": "Inventory Management"
+  },
+  {
+    "email": "rattanajj1989@gmail.com",
+    "name": "Rattana Kerdprakob",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "HWT2305",
+    "project_name": "HWT2305 : TE TRUE Merge/HWT_Rollout BMA Project",
+    "position": "Report Preparation Engineer"
+  },
+  {
+    "email": "beesomphon@gmail.com",
+    "name": "Somphon Wongwatanagonchai",
+    "section": "TE Project",
+    "team": "TE",
+    "project_code": "HWT2305",
+    "project_name": "HWT2305 : TE TRUE Merge/HWT_Rollout BMA Project",
+    "position": "Store Officer"
+  },
+  {
+    "email": "sasikarn4932@gmail.com",
+    "name": "Sasikarn Boot-ngarm",
+    "section": "Enterprise Project",
+    "team": "Other",
+    "project_code": "WW2503",
+    "project_name": "WW2503 : WW Orange Line Project",
+    "position": "Safety Officer"
+  },
+  {
+    "email": "pawaranpuyati@gmail.com",
+    "name": "Pawaran Puyati",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "tipanan3018@gmail.com",
+    "name": "Tipanan Pongpaew",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "chonlada.boon18@gmail.com",
+    "name": "Chonlada Boonchottiphong",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2306",
+    "project_name": "HWT2306 : RF NPM Package TRUE Merge EAS Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "james.natthaphonk032@gmail.com",
+    "name": "Natthaphon Kalaphakde",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "lin40171@gmail.com",
+    "name": "Lin Saleepan",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2307",
+    "project_name": "HWT2307 : RF NPM Package AIS NT700 EEC Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "sulimatsonain@gmail.com",
+    "name": "Sulimat Sonain",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "kunwadeehoimala@gmail.com",
+    "name": "Kunwadee Hoi-mala",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "wuttisit41829@gmail.com",
+    "name": "Wuttisit Seewasao",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "phuchuad@gmail.com",
+    "name": "Phudit Chuadnuch",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2307",
+    "project_name": "HWT2307 : RF NPM Package AIS NT700 EEC Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "pollawat2344@gmail.com",
+    "name": "Phonlawat Kwanthong",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "mr.jukkraphon@gmail.com",
+    "name": "Jukkraphon Meechai",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer/TL"
+  },
+  {
+    "email": "chokzee.cc@gmail.com",
+    "name": "Chokchai Chinnarach",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "macdrums78@gmail.com",
+    "name": "Patsakorn Witenjit",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "ZTE2301",
+    "project_name": "ZTE2301 : RF TRUE Merge/ZTE_Rollout South Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "ock1820@gmail.com",
+    "name": "Chin-nakrit Krongthong",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "suraphop79@gmail.com",
+    "name": "Suraphop Kampakdee",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2304",
+    "project_name": "HWT2304 : RF TRUE Merge/HWT_Rollout EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "nuttapongnotto@gmail.com",
+    "name": "Natthaphong Khaokaen",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2304",
+    "project_name": "HWT2304 : RF TRUE Merge/HWT_Rollout EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "wipada.mangwi123@gmail.com",
+    "name": "Wipada Srisurad",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2304",
+    "project_name": "HWT2304 : RF TRUE Merge/HWT_Rollout EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "",
+    "name": "Jaran Songphai",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2306",
+    "project_name": "HWT2306 : RF NPM Package TRUE Merge EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "",
+    "name": "Taned Yusabai",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2306",
+    "project_name": "HWT2306 : RF NPM Package TRUE Merge EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "m2029.arsenal@gmail.com",
+    "name": "Chatchai Lerdlopthatri",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "jeerasakwongphapa@gmail.com",
+    "name": "Chirasak Wongphapa",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "danai12342011@gmail.com",
+    "name": "Danai Chaiyasit",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "monthian0706@gmail.com",
+    "name": "Monthian Chairakrian",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2301",
+    "project_name": "HWT2301 : RF AIS/HWT NT700 EEC project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "",
+    "name": "Nattdanai Kittaponsakun",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "niramol.huawei@gmail.com",
+    "name": "Niramol Kuldilok",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "HWT2501",
+    "project_name": "HWT2501 : RF New NPM TRUE Merge support complain EAS Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "yutthaphichai300741@gmail.com",
+    "name": "Yutthaphichai Yuenkrathok",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "himavari19@gmail.com",
+    "name": "Boonlert Aramworaphaisan",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "NBTC2501",
+    "project_name": "NBTC2501 : NBTC NSA/SA Benchmarking Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "payonrat.jub.rf@gmail.com",
+    "name": "Payonrat Phothiwat",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "airconnect.istallation@gmail.com",
+    "name": "Thanawut Kuwangkadilok",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "NBTC2502",
+    "project_name": "NBTC2502 : NBTC DRONE Thai Border Verification Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "macdrums78@gmail.com",
+    "name": "Patsakorn Witenjit",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "chokzee.cc@gmail.com",
+    "name": "Chokchai Chinnarach",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "pathanin2538@gmail.com",
+    "name": "Pathanin Neampiboon",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "thanaphongtri@gmail.com",
+    "name": "Thanaphong Triphanitkun",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "yuiyuiyui803@gmail.com",
+    "name": "Panukon Sonsinpong",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  },
+  {
+    "email": "panuwat.phiw@gmail.com",
+    "name": "Panuwat Piwngam",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Analysis Engineer"
+  },
+  {
+    "email": "kittiphong.psauto@gmail.com",
+    "name": "Kittiphong Wongsakul",
+    "section": "RF Project",
+    "team": "RF",
+    "project_code": "AIS2601",
+    "project_name": "AIS2601 : AIS BMA Optimization Service Project",
+    "position": "Drive Test Engineer"
+  }
+]

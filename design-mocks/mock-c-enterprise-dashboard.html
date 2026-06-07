@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Mock C — Enterprise Dashboard · ACE System</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand:#0369a1;
+    --brand-700:#075985;
+    --ok:#16a34a;
+    --warn:#d97706;
+    --err:#dc2626;
+    --line:#e4e7eb;
+    --line-strong:#cbd5e1;
+    --bg:#f1f4f8;
+    --ink:#0f172a;
+    --muted:#64748b;
+  }
+  html,body{font-family:"Inter","Sarabun",ui-sans-serif,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
+  .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:6px}
+  .panel-head{padding:8px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;background:#f8fafc;font-weight:600;font-size:12px;letter-spacing:.02em;color:#334155;text-transform:uppercase}
+  .sn-section{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:8px 12px 4px}
+  .sn-link{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12.5px;color:#334155;border-left:2px solid transparent}
+  .sn-link:hover{background:#f1f5f9}
+  .sn-link.active{background:#e0f2fe;color:#0369a1;border-left-color:#0369a1;font-weight:600}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:3px;font-size:10.5px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+  .chip-green{background:#dcfce7;color:#15803d}
+  .chip-red{background:#fee2e2;color:#b91c1c}
+  .chip-blue{background:#dbeafe;color:#1d4ed8}
+  .chip-amber{background:#fef3c7;color:#a16207}
+  .chip-slate{background:#e2e8f0;color:#475569}
+  .kbd{font-family:"JetBrains Mono",monospace;background:#f1f5f9;border:1px solid #e2e8f0;border-bottom-width:2px;padding:0 4px;border-radius:3px;font-size:10.5px}
+  table.dense th, table.dense td{padding:5px 10px}
+  table.dense tr+tr{border-top:1px solid #f1f5f9}
+  table.dense thead{background:#f8fafc;border-bottom:1px solid var(--line);color:#475569;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+  .sparkline{height:32px;display:flex;align-items:flex-end;gap:2px}
+  .spk{width:4px;background:#0369a1;border-radius:1px;opacity:.85}
+</style>
+</head>
+<body class="min-h-screen">
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <aside class="w-56 bg-white border-r border-slate-200 flex flex-col shrink-0">
+    <div class="px-3 py-3 border-b border-slate-200 flex items-center gap-2">
+      <img src="../frontend/public/ace-logo.png" alt="ACE" width="30" height="30" class="rounded object-contain shrink-0">
+      <div>
+        <div class="font-bold text-[13px] leading-none">ACE System</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">v4 · prod</div>
+      </div>
+    </div>
+
+    <nav class="overflow-y-auto flex-1 py-1">
+      <div class="sn-section">Overview</div>
+      <a class="sn-link"><span>◧</span>Overview</a>
+
+      <div class="sn-section">My Workspace</div>
+      <a class="sn-link"><span>◷</span>Clock App</a>
+      <a class="sn-link"><span>≡</span>Daily Work Log</a>
+      <a class="sn-link"><span>☑</span>Approvals <span class="ml-auto chip chip-amber">3</span></a>
+
+      <div class="sn-section">Clock</div>
+      <a class="sn-link active"><span>◉</span>Clock Monitor</a>
+      <a class="sn-link"><span>▣</span>Live Wallboard</a>
+
+      <div class="sn-section">HR</div>
+      <a class="sn-link"><span>◐</span>Employees</a>
+      <a class="sn-link"><span>◑</span>Analytics</a>
+
+      <div class="sn-section">Project</div>
+      <a class="sn-link"><span>◆</span>Project Mgmt</a>
+      <a class="sn-link"><span>◇</span>RF Monitor</a>
+      <a class="sn-link"><span>◇</span>Pre-Site</a>
+
+      <div class="sn-section">Finance</div>
+      <a class="sn-link"><span>$</span>Rev & Expense</a>
+      <a class="sn-link"><span>↑</span>PO Import</a>
+      <a class="sn-link"><span>≣</span>DTE Payments</a>
+
+      <div class="sn-section">KPI</div>
+      <a class="sn-link"><span>▲</span>Evaluation</a>
+      <a class="sn-link"><span>△</span>Self-Assess</a>
+
+      <div class="sn-section">Admin</div>
+      <a class="sn-link"><span>⚙</span>Users</a>
+      <a class="sn-link"><span>⚙</span>Roles</a>
+    </nav>
+
+    <div class="border-t border-slate-200 px-3 py-2 text-[11px] text-slate-500 flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> backend healthy · 12ms
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0 flex flex-col">
+    <!-- Topbar -->
+    <header class="bg-white border-b border-slate-200 px-4 h-11 flex items-center gap-4 shrink-0">
+      <div class="text-[12px] text-slate-500 flex items-center gap-1.5">
+        <span>Clock</span><span class="text-slate-300">/</span><span class="text-slate-900 font-semibold">Clock Monitor</span>
+      </div>
+      <div class="text-[11px] text-slate-400 mono">31 May 2026 · 09:42:18 ICT · auto-refresh 30s</div>
+      <div class="ml-auto flex items-center gap-2">
+        <button class="text-[12px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50">⟳ Refresh</button>
+        <button class="text-[12px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50">⬇ Export</button>
+        <span class="kbd">⌘K</span>
+        <div class="w-7 h-7 rounded-full bg-[var(--brand)] text-white grid place-items-center text-[11px] font-bold">PP</div>
+      </div>
+    </header>
+
+    <!-- Tabs strip -->
+    <div class="bg-white border-b border-slate-200 px-4 h-9 flex items-center gap-0.5 text-[12px] shrink-0">
+      <button class="px-3 h-9 border-b-2 border-[var(--brand)] font-semibold text-[var(--brand)]">Daily</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Weekly</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Monthly</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Individual</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Map Live</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Attendance</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Movement</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Admin Attn</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Health</button>
+      <button class="px-3 h-9 text-slate-600 hover:bg-slate-50">Leave Reqs <span class="ml-1 chip chip-amber">5</span></button>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2 text-[12px] shrink-0">
+      <select class="border border-slate-200 rounded px-2 py-1 text-[12px]"><option>All Teams</option><option>DTE</option><option>TE</option><option>DTA</option><option>RF</option></select>
+      <select class="border border-slate-200 rounded px-2 py-1 text-[12px]"><option>All Projects</option><option>HWT2304</option><option>HWT2604</option></select>
+      <input class="border border-slate-200 rounded px-2 py-1 text-[12px] w-56" placeholder="ค้นหา name / email / site / status…">
+      <span class="text-slate-400 mx-1">|</span>
+      <span class="text-slate-500">date:</span>
+      <input type="date" value="2026-05-31" class="border border-slate-200 rounded px-2 py-1 text-[12px] mono">
+      <span class="ml-auto text-slate-500">showing <b class="text-slate-900">168</b> of 168</span>
+    </div>
+
+    <!-- Body grid -->
+    <div class="p-3 grid grid-cols-12 gap-3 flex-1">
+
+      <!-- KPI strip -->
+      <div class="col-span-12 grid grid-cols-6 gap-3">
+        <div class="panel p-3">
+          <div class="text-[10.5px] text-slate-500 uppercase tracking-wider font-bold">Clocked In</div>
+          <div class="flex items-end justify-between mt-1">
+            <div class="text-2xl font-bold mono">142<span class="text-sm text-slate-400">/168</span></div>
+            <div class="text-[11px] text-emerald-600 font-semibold mono">+8 ▲</div>
+          </div>
+          <div class="sparkline mt-2">
+            <div class="spk" style="height:40%"></div><div class="spk" style="height:55%"></div><div class="spk" style="height:48%"></div><div class="spk" style="height:62%"></div><div class="spk" style="height:75%"></div><div class="spk" style="height:68%"></div><div class="spk" style="height:88%"></div>
+          </div>
+        </div>
+        <div class="panel p-3">
+          <div class="text-[10.5px] text-slate-500 uppercase tracking-wider font-bold">On Site</div>
+          <div class="flex items-end justify-between mt-1"><div class="text-2xl font-bold mono text-emerald-600">118</div><div class="text-[11px] text-slate-500 mono">83%</div></div>
+          <div class="sparkline mt-2">
+            <div class="spk bg-emerald-500" style="height:60%"></div><div class="spk bg-emerald-500" style="height:65%"></div><div class="spk bg-emerald-500" style="height:70%"></div><div class="spk bg-emerald-500" style="height:75%"></div><div class="spk bg-emerald-500" style="height:80%"></div><div class="spk bg-emerald-500" style="height:78%"></div><div class="spk bg-emerald-500" style="height:85%"></div>
+          </div>
+        </div>
+        <div class="panel p-3">
+          <div class="text-[10.5px] text-slate-500 uppercase tracking-wider font-bold">Off Site</div>
+          <div class="flex items-end justify-between mt-1"><div class="text-2xl font-bold mono text-red-600">24</div><div class="text-[11px] text-red-600 font-semibold mono">+4 ▲</div></div>
+          <div class="text-[10.5px] text-slate-500 mt-2">Geofence breach: <b class="text-slate-900">11</b></div>
+        </div>
+        <div class="panel p-3">
+          <div class="text-[10.5px] text-slate-500 uppercase tracking-wider font-bold">Not Yet</div>
+          <div class="flex items-end justify-between mt-1"><div class="text-2xl font-bold mono text-slate-400">26</div><div class="text-[11px] text-slate-500 mono">15.5%</div></div>
+          <div class="text-[10.5px] text-slate-500 mt-2">On leave: <b class="text-slate-900">5</b></div>
+        </div>
+        <div class="panel p-3">
+          <div class="text-[10.5px] text-slate-500 uppercase tracking-wider font-bold">Avg Clock-In</div>
+          <div class="flex items-end justify-between mt-1"><div class="text-2xl font-bold mono">08:14</div><div class="text-[11px] text-emerald-600 font-semibold mono">−6m</div></div>
+          <div class="text-[10.5px] text-slate-500 mt-2">Target: 08:30</div>
+        </div>
+        <div class="panel p-3">
+          <div class="text-[10.5px] text-slate-500 uppercase tracking-wider font-bold">Issues</div>
+          <div class="flex items-end justify-between mt-1"><div class="text-2xl font-bold mono text-amber-600">7</div><div class="text-[11px] text-slate-500 mono">attn</div></div>
+          <div class="text-[10.5px] text-slate-500 mt-2">No-photo: 3 · No-GPS: 4</div>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="col-span-6 panel">
+        <div class="panel-head">
+          <span>Hourly Clock-in</span>
+          <span class="ml-auto mono text-[10.5px] text-slate-500 normal-case">today vs avg 7d</span>
+        </div>
+        <div class="p-3 h-44"><canvas id="chartC1"></canvas></div>
+      </div>
+      <div class="col-span-3 panel">
+        <div class="panel-head">Status Mix</div>
+        <div class="p-3 h-44"><canvas id="chartC2"></canvas></div>
+      </div>
+      <div class="col-span-3 panel">
+        <div class="panel-head">Issues / Day · 14d</div>
+        <div class="p-3 h-44"><canvas id="chartC3"></canvas></div>
+      </div>
+
+      <!-- Coverage by project + Stacked area -->
+      <div class="col-span-7 panel">
+        <div class="panel-head">
+          <span>Coverage by Project · 7d</span>
+          <span class="ml-auto mono text-[10.5px] text-slate-500 normal-case">on-site % | target 85%</span>
+        </div>
+        <div class="p-3 h-44"><canvas id="chartC4"></canvas></div>
+      </div>
+      <div class="col-span-5 panel">
+        <div class="panel-head">
+          <span>Status Stack · 30d</span>
+          <span class="ml-auto mono text-[10.5px] text-slate-500 normal-case">daily breakdown</span>
+        </div>
+        <div class="p-3 h-44"><canvas id="chartC5"></canvas></div>
+      </div>
+
+      <!-- Main table panel -->
+      <div class="col-span-9 panel">
+        <div class="panel-head">
+          <span>Employee Sessions · Today</span>
+          <span class="ml-auto mono text-[10.5px] text-slate-500 normal-case">/api/clock/monitor/events?date=2026-05-31</span>
+        </div>
+        <table class="dense w-full">
+          <thead>
+            <tr>
+              <th class="text-left">Employee</th>
+              <th class="text-left">Role</th>
+              <th class="text-left">Project</th>
+              <th class="text-left">Site</th>
+              <th class="text-left mono">In</th>
+              <th class="text-left mono">Out</th>
+              <th class="text-left mono">Dur</th>
+              <th class="text-left mono">Dist</th>
+              <th class="text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody class="text-[12.5px]">
+            <tr class="hover:bg-slate-50"><td class="font-medium">Peerapol Piamsri <span class="text-slate-400 mono">ACE056</span></td><td class="text-slate-600">DTE</td><td class="mono">HWT2304</td><td class="mono">BKK-RF-014</td><td class="mono">07:48</td><td class="mono text-slate-400">—</td><td class="mono">1h54m</td><td class="mono">42m</td><td><span class="chip chip-green">ON SITE</span></td></tr>
+            <tr class="hover:bg-slate-50"><td class="font-medium">Somchai Wong <span class="text-slate-400 mono">ACE112</span></td><td class="text-slate-600">TE</td><td class="mono">HWT2604</td><td class="text-slate-400">—</td><td class="mono">08:02</td><td class="mono text-slate-400">—</td><td class="mono">1h40m</td><td class="mono">0m</td><td><span class="chip chip-blue">OFFICE</span></td></tr>
+            <tr class="hover:bg-slate-50"><td class="font-medium">Niran Chaisri <span class="text-slate-400 mono">ACE201</span></td><td class="text-slate-600">DTA</td><td class="mono">HWT2304</td><td class="mono">CNX-RF-002</td><td class="mono">08:15</td><td class="mono text-slate-400">—</td><td class="mono">1h27m</td><td class="mono text-red-600">412m</td><td><span class="chip chip-red">OFF SITE</span></td></tr>
+            <tr class="hover:bg-slate-50"><td class="font-medium">Achara Suk <span class="text-slate-400 mono">ACE318</span></td><td class="text-slate-600">DTE</td><td class="mono">HWT2604</td><td class="mono">UBN-RF-007</td><td class="mono text-slate-400">—</td><td class="mono text-slate-400">—</td><td class="mono text-slate-400">—</td><td class="mono text-slate-400">—</td><td><span class="chip chip-slate">NOT YET</span></td></tr>
+            <tr class="hover:bg-slate-50"><td class="font-medium">Wichai Bun <span class="text-slate-400 mono">ACE405</span></td><td class="text-slate-600">PM</td><td class="text-slate-400">—</td><td class="text-slate-400">—</td><td class="mono">09:30</td><td class="mono text-slate-400">—</td><td class="mono text-slate-400">—</td><td class="mono text-slate-400">—</td><td><span class="chip chip-amber">LEAVE (SICK)</span></td></tr>
+            <tr class="hover:bg-slate-50"><td class="font-medium">Suda Phong <span class="text-slate-400 mono">ACE418</span></td><td class="text-slate-600">DTE</td><td class="mono">HWT2304</td><td class="mono">HKT-RF-021</td><td class="mono">07:32</td><td class="mono">12:14</td><td class="mono">4h42m</td><td class="mono">18m</td><td><span class="chip chip-green">ON SITE</span></td></tr>
+            <tr class="hover:bg-slate-50"><td class="font-medium">Kanya Lim <span class="text-slate-400 mono">ACE522</span></td><td class="text-slate-600">TE</td><td class="mono">HWT2604</td><td class="text-slate-400">—</td><td class="mono">08:48</td><td class="mono text-slate-400">—</td><td class="mono">54m</td><td class="mono">0m</td><td><span class="chip chip-blue">OFFICE</span></td></tr>
+            <tr class="hover:bg-slate-50"><td class="font-medium">Anan Sri <span class="text-slate-400 mono">ACE601</span></td><td class="text-slate-600">DTA</td><td class="mono">HWT2304</td><td class="mono">RYG-RF-011</td><td class="mono">07:55</td><td class="mono text-slate-400">—</td><td class="mono">1h47m</td><td class="mono">38m</td><td><span class="chip chip-green">ON SITE</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Side panel: status breakdown -->
+      <div class="col-span-3 space-y-3">
+        <div class="panel">
+          <div class="panel-head">Status Breakdown</div>
+          <div class="p-3 space-y-2 text-[12px]">
+            <div class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>On Site</span><span class="mono font-semibold">118</span></div>
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500" style="width:70%"></div></div>
+            <div class="flex items-center justify-between mt-3"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span>Office</span><span class="mono font-semibold">24</span></div>
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-blue-500" style="width:14%"></div></div>
+            <div class="flex items-center justify-between mt-3"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500"></span>Off Site</span><span class="mono font-semibold">24</span></div>
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-red-500" style="width:14%"></div></div>
+            <div class="flex items-center justify-between mt-3"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500"></span>Leave</span><span class="mono font-semibold">5</span></div>
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-amber-500" style="width:3%"></div></div>
+            <div class="flex items-center justify-between mt-3"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-400"></span>Not Yet</span><span class="mono font-semibold">26</span></div>
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-slate-400" style="width:15.5%"></div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">Admin Attention <span class="ml-auto chip chip-amber normal-case">7 issues</span></div>
+          <ul class="text-[12px] divide-y divide-slate-100">
+            <li class="p-2.5 flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5"></span><div><div class="font-medium">No photo on clock-in</div><div class="text-[11px] text-slate-500">ACE201, ACE318, +1</div></div></li>
+            <li class="p-2.5 flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5"></span><div><div class="font-medium">GPS missing</div><div class="text-[11px] text-slate-500">ACE418, ACE522</div></div></li>
+            <li class="p-2.5 flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5"></span><div><div class="font-medium">Long session > 12h</div><div class="text-[11px] text-slate-500">ACE601 (since 21:14 yesterday)</div></div></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-span-12 text-center text-[10.5px] text-slate-400 pt-2">— Mock C · Enterprise Dashboard · 13px base, 6px radius, dense tables, mono numerics, sparklines —</div>
+    </div>
+  </main>
+</div>
+<script>
+  Chart.defaults.font.family = 'Inter, Sarabun, sans-serif'
+  Chart.defaults.font.size = 10.5
+  Chart.defaults.color = '#64748b'
+  Chart.defaults.borderColor = '#e4e7eb'
+
+  const tooltipBase = { backgroundColor:'#0f172a', padding:8, cornerRadius:4, displayColors:false, titleFont:{size:11, weight:'600'}, bodyFont:{size:11, family:'JetBrains Mono, monospace'} }
+
+  new Chart(document.getElementById('chartC1'), {
+    type:'line',
+    data:{
+      labels:['06','07','08','09','10','11','12','13','14','15','16','17','18'],
+      datasets:[
+        {label:'today', data:[2,18,72,142,148,151,155,148,142,138,134,128,108], borderColor:'#0369a1', backgroundColor:'rgba(3,105,161,.12)', borderWidth:1.8, tension:.35, pointRadius:0, fill:true},
+        {label:'avg 7d', data:[1,14,62,128,140,144,148,142,138,132,130,124,102], borderColor:'#94a3b8', borderWidth:1.5, borderDash:[4,3], tension:.35, pointRadius:0, fill:false}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',align:'end',labels:{boxWidth:10,boxHeight:2,font:{size:10}}},tooltip:tooltipBase},scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},beginAtZero:true,ticks:{padding:4}}}}
+  })
+
+  new Chart(document.getElementById('chartC2'), {
+    type:'doughnut',
+    data:{labels:['On Site','Office','Off Site','Leave','Not Yet'],datasets:[{data:[118,24,24,5,26],backgroundColor:['#16a34a','#0369a1','#dc2626','#d97706','#cbd5e1'],borderWidth:1,borderColor:'#fff'}]},
+    options:{cutout:'60%',plugins:{legend:{position:'right',labels:{boxWidth:8,boxHeight:8,padding:6,font:{size:10.5}}},tooltip:tooltipBase}}
+  })
+
+  new Chart(document.getElementById('chartC3'), {
+    type:'bar',
+    data:{labels:Array.from({length:14},(_,i)=>i+18),datasets:[
+      {label:'No-photo',data:[2,1,3,2,4,1,0,0,2,3,1,2,3,3],backgroundColor:'#dc2626',stack:'a',barThickness:8},
+      {label:'No-GPS',data:[1,2,1,3,2,1,0,0,1,2,3,2,4,4],backgroundColor:'#d97706',stack:'a',barThickness:8},
+      {label:'Long session',data:[0,1,1,0,2,1,0,0,1,1,0,1,1,0],backgroundColor:'#a16207',stack:'a',barThickness:8}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',align:'end',labels:{boxWidth:8,boxHeight:8,font:{size:10}}},tooltip:tooltipBase},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,grid:{color:'#f1f5f9'},beginAtZero:true,ticks:{padding:4}}}}
+  })
+
+  new Chart(document.getElementById('chartC4'), {
+    type:'bar',
+    data:{
+      labels:['HWT2304','HWT2604','HWT2105','HWT2208','HWT2412','HWT2701','HWT2808','HWT2920','HWT3001','HWT3102'],
+      datasets:[
+        {label:'on-site %',data:[92,87,78,84,73,68,90,82,88,75],backgroundColor:(ctx)=>{const v=ctx.raw;return v>=85?'#16a34a':v>=75?'#d97706':'#dc2626'},borderRadius:2,barThickness:14},
+        {label:'target',data:Array(10).fill(85),type:'line',borderColor:'#0369a1',borderWidth:1.5,borderDash:[4,3],pointRadius:0,tension:0}
+      ]
+    },
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:tooltipBase},scales:{x:{max:100,grid:{color:'#f1f5f9'},ticks:{padding:4,callback:v=>v+'%'}},y:{grid:{display:false},ticks:{font:{family:'JetBrains Mono, monospace',size:10}}}}}
+  })
+
+  new Chart(document.getElementById('chartC5'), {
+    type:'line',
+    data:{
+      labels:Array.from({length:30},(_,i)=>i+1),
+      datasets:[
+        {label:'On Site',data:[112,118,108,115,120,122,118,0,0,115,124,128,122,118,125,0,0,120,128,132,135,128,124,0,0,118,128,135,138,142],backgroundColor:'rgba(22,163,74,.7)',borderWidth:0,fill:true,pointRadius:0,tension:.3,stack:'a'},
+        {label:'Office',data:[22,24,20,25,28,26,24,0,0,22,26,28,30,28,24,0,0,26,28,30,32,28,26,0,0,24,26,28,30,24],backgroundColor:'rgba(3,105,161,.7)',borderWidth:0,fill:true,pointRadius:0,tension:.3,stack:'a'},
+        {label:'Off Site',data:[18,20,22,18,16,14,12,0,0,18,20,18,16,18,14,0,0,16,18,20,18,20,22,0,0,20,18,16,18,24],backgroundColor:'rgba(220,38,38,.65)',borderWidth:0,fill:true,pointRadius:0,tension:.3,stack:'a'}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',align:'end',labels:{boxWidth:8,boxHeight:8,font:{size:10}}},tooltip:tooltipBase},scales:{x:{grid:{display:false},ticks:{font:{family:'JetBrains Mono, monospace',size:9},maxRotation:0}},y:{stacked:true,grid:{color:'#f1f5f9'},beginAtZero:true,ticks:{padding:4}}}}
+  })
+</script>
+</body>
+</html>

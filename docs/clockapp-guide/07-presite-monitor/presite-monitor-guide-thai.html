@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACE Pre-Site Monitor Guide</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9eef5; font-family: "Segoe UI", Tahoma, sans-serif; color: #0f172a; }
+    .poster {
+      width: 1240px; height: 1754px; margin: 0 auto; overflow: hidden; padding: 38px 54px 34px;
+      background:
+        radial-gradient(circle at 7% 8%, rgba(36,71,216,.16), transparent 28%),
+        radial-gradient(circle at 92% 4%, rgba(191,48,64,.16), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    }
+    .hero { border-radius: 28px; padding: 28px 38px; color: #fff; background: linear-gradient(135deg, #2447d8 0%, #70328d 48%, #c0392b 100%); box-shadow: 0 22px 60px rgba(36,71,216,.22); }
+    .kicker { display: inline-flex; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,.16); font-size: 19px; font-weight: 850; }
+    h1 { margin: 16px 0 8px; font-size: 48px; line-height: 1.05; letter-spacing: -1px; }
+    .subtitle { max-width: 960px; font-size: 23px; line-height: 1.42; color: rgba(255,255,255,.9); font-weight: 700; }
+    .section-title { display: flex; justify-content: space-between; align-items: end; margin: 24px 4px 14px; }
+    .section-title h2 { margin: 0; font-size: 31px; letter-spacing: -.4px; }
+    .section-title p { margin: 0; color: #64748b; font-size: 17px; font-weight: 750; }
+    .main-flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; align-items: stretch; }
+    .flow-card { min-height: 218px; border-radius: 20px; background: #fff; border: 1px solid #dfe6f0; box-shadow: 0 16px 38px rgba(15,23,42,.08); padding: 15px 14px; position: relative; }
+    .num { width: 36px; height: 36px; border-radius: 12px; background: #2447d8; color: white; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 950; margin-bottom: 10px; }
+    .flow-card h3 { margin: 0 0 8px; font-size: 18px; line-height: 1.15; }
+    .flow-card p { margin: 0; color: #475569; font-size: 13.5px; line-height: 1.36; font-weight: 720; }
+    .role { margin-top: 10px; display: inline-flex; border-radius: 999px; background: #eef2ff; color: #2447d8; padding: 5px 8px; font-size: 11px; font-weight: 950; }
+    .arrow { position: absolute; right: -12px; top: 98px; z-index: 2; width: 24px; height: 24px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #cbd5e1; color: #64748b; font-weight: 950; }
+    .flow-card:last-child .arrow { display: none; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .panel { border-radius: 24px; background: #fff; border: 1px solid #dfe6f0; box-shadow: 0 18px 46px rgba(15,23,42,.09); padding: 20px 22px; }
+    .panel h3 { margin: 0 0 14px; font-size: 25px; }
+    .swim { display: grid; gap: 9px; }
+    .swim-row { display: grid; grid-template-columns: 126px 1fr; gap: 10px; align-items: center; }
+    .lane-name { border-radius: 12px; padding: 9px 10px; background: #eef2ff; color: #2447d8; font-size: 13px; line-height: 1.2; font-weight: 950; text-align: center; }
+    .lane-steps { display: flex; align-items: center; gap: 5px; min-width: 0; }
+    .step { min-width: 78px; border-radius: 12px; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; padding: 8px 7px; text-align: center; font-size: 11px; line-height: 1.14; font-weight: 950; }
+    .blue { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+    .green { background: #ecfdf5; border-color: #86efac; color: #166534; }
+    .amber { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .purple { background: #f3e8ff; border-color: #d8b4fe; color: #6b21a8; }
+    .red { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+    .arr { color: #94a3b8; font-weight: 950; }
+    .rule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .rule { border-radius: 18px; border: 1px dashed #cbd5e1; background: #f8fafc; padding: 14px; }
+    .rule b { display: block; font-size: 18px; margin-bottom: 6px; }
+    .rule span { display: block; color: #475569; font-size: 14.5px; line-height: 1.36; font-weight: 700; }
+    .status-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 18px; }
+    .status { min-height: 98px; border-radius: 18px; padding: 12px; text-align: center; background: #fff; border: 1px solid #dfe6f0; box-shadow: 0 12px 30px rgba(15,23,42,.06); }
+    .dot { width: 20px; height: 20px; border-radius: 999px; margin: 0 auto 8px; }
+    .d1 { background:#7c3aed; } .d2 { background:#059669; } .d3 { background:#16a34a; } .d4 { background:#15803d; } .d5 { background:#2447d8; } .d6 { background:#9a3412; } .d7 { background:#64748b; }
+    .status b { display:block; font-size: 13px; line-height: 1.15; }
+    .status span { display:block; margin-top:4px; color:#64748b; font-size:11.5px; line-height:1.22; font-weight:700; }
+    .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .note ul { margin: 0; padding-left: 23px; color: #334155; font-size: 16.5px; line-height: 1.42; font-weight: 690; }
+    .contact-band { margin-top: 18px; display: grid; grid-template-columns: 1fr 165px; gap: 18px; align-items: center; border-radius: 22px; background: #fff; border: 1px solid #dfe6f0; box-shadow: 0 16px 40px rgba(15,23,42,.07); padding: 18px 24px; }
+    .contact-band h3 { margin: 0 0 8px; font-size: 24px; }
+    .contact-band p { margin: 0; color: #475569; font-size: 17px; line-height: 1.42; font-weight: 720; }
+    .pill-row { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .pill { border-radius: 999px; background: #eef2ff; color: #2447d8; padding: 7px 12px; font-size: 14px; font-weight: 900; }
+    .qr { justify-self: end; width: 130px; height: 130px; border-radius: 16px; border: 8px solid #fff; box-shadow: 0 12px 26px rgba(15,23,42,.16); background: #fff; }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <section class="hero">
+      <div class="kicker">ACE SYSTEM | Pre-Site Monitor</div>
+      <h1>ขั้นตอนการใช้งาน Pre-Site Monitor</h1>
+      <div class="subtitle">สำหรับ DTE ใช้ตรวจไซต์ที่ได้รับมอบหมาย ดูสถานะงาน รายงาน ผลตรวจ และสถานะจ่ายเงิน</div>
+    </section>
+
+    <div class="section-title">
+      <h2>ขั้นตอนหลัก</h2>
+      <p>เข้าใช้งานที่ /project/presite-monitor</p>
+    </div>
+    <section class="main-flow">
+      <div class="flow-card"><div class="num">1</div><h3>เปิดหน้า Monitor</h3><p>เข้าเมนู Pre-Site Monitor หลัง Login เพื่อดูสถานะงาน Per-Site ที่ระบบติดตามไว้</p><span class="role">Open</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">2</div><h3>เลือกมุมมอง</h3><p>ใช้เมนูซ้ายเลือก Daily, SSV Pre-Site, PAC Pre-Site หรือ DTE Details ตามสิ่งที่ต้องการตรวจ</p><span class="role">Menu</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">3</div><h3>ค้นหา / Filter</h3><p>ค้นหาด้วย Site หรือ DTE, เลือก Project, Stage, Date และกด Refresh เมื่อต้องการข้อมูลล่าสุด</p><span class="role">Search</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">4</div><h3>อ่านตารางสถานะ</h3><p>ดู DT Plan, Start, End, Report, Check, SLA และ Rework เพื่อรู้ว่าไซต์อยู่ขั้นตอนไหน</p><span class="role">Status</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">5</div><h3>เปิดรายละเอียดไซต์</h3><p>คลิกแถวไซต์เพื่อดู Timeline, Rounds, Audit log, Check notes และไฟล์รายงานที่อัปโหลด</p><span class="role">Detail</span><div class="arrow">›</div></div>
+      <div class="flow-card"><div class="num">6</div><h3>ติดตามผล</h3><p>ถ้า Check Fail ให้แก้ไขตาม notes แล้วส่งรายงานใหม่; ถ้า ACE_APPROVED ให้รอสถานะจ่ายเงิน</p><span class="role">Follow up</span></div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h3>สถานะที่ต้องอ่านให้เป็น</h3>
+        <div class="swim">
+          <div class="swim-row"><div class="lane-name">Assigned</div><div class="lane-steps"><span class="step green">Planned</span><span class="arr">→</span><span class="step blue">Site appears</span></div></div>
+          <div class="swim-row"><div class="lane-name">Clock</div><div class="lane-steps"><span class="step blue">DT Started</span><span class="arr">→</span><span class="step green">DT Done</span></div></div>
+          <div class="swim-row"><div class="lane-name">Report</div><div class="lane-steps"><span class="step purple">Report Done</span><span class="arr">→</span><span class="step amber">Checking</span><span class="arr">→</span><span class="step green">ACE Approved</span></div></div>
+          <div class="swim-row"><div class="lane-name">Payment</div><div class="lane-steps"><span class="step red">Ready to Pay</span><span class="arr">→</span><span class="step green">DTE Paid</span></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>จุดที่ DTE ควรเช็ก</h3>
+        <div class="rule-grid">
+          <div class="rule"><b>เห็นไซต์หรือไม่</b><span>ถ้าไม่เห็นไซต์ ให้แจ้ง PM ตรวจการ Assign / Plan DTE และสิทธิ์ PER_SITE</span></div>
+          <div class="rule"><b>Clock Complete แล้วหรือยัง</b><span>สถานะ DT_DONE จะเกิดเมื่อ End Site เป็น COMPLETE จาก ClockApp</span></div>
+          <div class="rule"><b>Report แนบแล้วหรือยัง</b><span>เมื่ออัปโหลด .rar สำเร็จ ตารางจะแสดง Report Done หรือไฟล์แนบให้ตรวจ</span></div>
+          <div class="rule"><b>มี Check Fail ไหม</b><span>เปิดแถวไซต์เพื่ออ่าน notes และดำเนินการแก้ไขก่อนส่งใหม่</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="status-grid">
+      <div class="status"><div class="dot d1"></div><b>PENDING SITE MAP</b><span>รอข้อมูลไซต์</span></div>
+      <div class="status"><div class="dot d2"></div><b>PLANNED</b><span>มีแผน DTE แล้ว</span></div>
+      <div class="status"><div class="dot d3"></div><b>DT STARTED</b><span>เริ่มงานไซต์แล้ว</span></div>
+      <div class="status"><div class="dot d4"></div><b>DT DONE</b><span>End Complete แล้ว</span></div>
+      <div class="status"><div class="dot d5"></div><b>REPORT DONE</b><span>มีรายงานแล้ว</span></div>
+      <div class="status"><div class="dot d6"></div><b>ACE APPROVED</b><span>พร้อมเข้าจ่าย</span></div>
+      <div class="status"><div class="dot d7"></div><b>DTE PAID</b><span>จ่ายเงินแล้ว</span></div>
+    </section>
+
+    <section class="bottom-grid">
+      <div class="panel note">
+        <h3>เมนูที่ใช้บ่อย</h3>
+        <ul>
+          <li><b>Daily:</b> ดูกิจกรรม DT ของวันนี้และการ Sync จาก ClockApp</li>
+          <li><b>SSV Pre-Site:</b> ดูไซต์ SSV รายไซต์ พร้อม Stage / SLA / Rework</li>
+          <li><b>PAC Pre-Site:</b> ดูงาน Cluster / SSOA และรอบงานที่เกี่ยวข้อง</li>
+          <li><b>DTE Details:</b> ดูข้อมูล DTE, workload และกิจกรรมล่าสุด</li>
+        </ul>
+      </div>
+      <div class="panel note">
+        <h3>แนวทางแก้ปัญหาเร็ว</h3>
+        <ul>
+          <li>กด Refresh หลัง Clock หรือ Upload Report ถ้าสถานะยังไม่เปลี่ยน</li>
+          <li>ถ้าไซต์ไม่ขึ้นใน ClockApp หรือ Monitor ให้แจ้ง PM พร้อมชื่อไซต์</li>
+          <li>ถ้า Report ไม่ขึ้น ให้ตรวจว่าอัปโหลดผ่านหน้า Report Upload แล้ว</li>
+          <li>ถ้า Check Fail ให้เปิดรายละเอียดไซต์ อ่าน notes แล้วแก้ตามรายการ</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="contact-band">
+      <div>
+        <h3>ลิงก์ใช้งานหลัก</h3>
+        <p>Pre-Site Monitor: https://ace.airconnect-e.com/project/presite-monitor</p>
+        <p>ClockApp: /ClockApp · Report Upload: /project/report-upload · Payment Status: /finance/dte-payments</p>
+        <p>ผู้ออกแบบและติดต่อ: Peerapol Pianmsri</p>
+        <div class="pill-row"><span class="pill">A4 Infographic</span><span class="pill">Thai Version</span><span class="pill">Updated 2026-06-04</span></div>
+      </div>
+      <img class="qr" alt="QR Code to Pre-Site Monitor" src="presite-monitor-qr.png" />
+    </section>
+  </main>
+</body>
+</html>

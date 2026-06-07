@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>ACE Logo Concepts</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Sarabun:wght@400;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  html,body{font-family:"Inter","Sarabun",sans-serif;background:#f6f8fc;color:#0f172a}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:16px}
+  .wm{font-family:"Sora","Inter",sans-serif;font-weight:800;letter-spacing:-.02em}
+  .pick{position:relative;transition:transform .15s}
+  .pick:hover{transform:translateY(-3px)}
+  .pick .tag{position:absolute;top:10px;right:10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8}
+</style>
+</head>
+<body class="py-10">
+<div class="max-w-[1200px] mx-auto px-6">
+  <div class="mb-8">
+    <h1 class="text-3xl font-black tracking-tight">ACE · Logo Concepts</h1>
+    <p class="text-slate-500 mt-1">6 ไอเดียโลโก้ — ทุกตัวเป็น SVG (scale ได้ไม่แตก) · ใช้ brand gradient น้ำเงิน → แดง</p>
+  </div>
+
+  <!-- ===== Concept grid ===== -->
+  <div class="grid grid-cols-3 gap-5">
+
+    <!-- 1. A-Signal monogram -->
+    <div class="card p-7 pick">
+      <span class="tag">01 · A-Signal</span>
+      <div class="h-28 grid place-items-center">
+        <svg width="84" height="84" viewBox="0 0 64 64" fill="none">
+          <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#g1)"/>
+          <path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M25 36 H39" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>
+          <circle cx="32" cy="20" r="3.4" fill="#fff"/>
+          <defs><linearGradient id="g1" x1="2" y1="2" x2="62" y2="62"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="text-center mt-2">
+        <div class="wm text-xl">ACE <span class="text-slate-400 font-semibold">System</span></div>
+        <div class="text-[11px] text-slate-500 mt-0.5">ตัว "A" + จุดยอด = signal/peak</div>
+      </div>
+    </div>
+
+    <!-- 2. Hexagon node -->
+    <div class="card p-7 pick">
+      <span class="tag">02 · Hex Node</span>
+      <div class="h-28 grid place-items-center">
+        <svg width="84" height="84" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3 L55 16.5 V43.5 L32 57 L9 43.5 V16.5 Z" fill="url(#g2)"/>
+          <path d="M32 3 L55 16.5 V43.5 L32 57 L9 43.5 V16.5 Z" stroke="#fff" stroke-opacity=".25" stroke-width="1.5"/>
+          <text x="32" y="40" text-anchor="middle" font-family="Sora,Inter" font-weight="800" font-size="22" fill="#fff">A</text>
+          <defs><linearGradient id="g2" x1="9" y1="3" x2="55" y2="57"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="text-center mt-2">
+        <div class="wm text-xl">ACE</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">hexagon = network node / สถานี</div>
+      </div>
+    </div>
+
+    <!-- 3. Clock + A (attendance) -->
+    <div class="card p-7 pick">
+      <span class="tag">03 · Clock A</span>
+      <div class="h-28 grid place-items-center">
+        <svg width="84" height="84" viewBox="0 0 64 64" fill="none">
+          <circle cx="32" cy="32" r="28" fill="url(#g3)"/>
+          <circle cx="32" cy="32" r="28" stroke="#fff" stroke-opacity=".2" stroke-width="2"/>
+          <path d="M32 32 V16" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M32 32 L43 38" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="32" cy="32" r="3" fill="#fff"/>
+          <defs><linearGradient id="g3" x1="4" y1="4" x2="60" y2="60"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="text-center mt-2">
+        <div class="wm text-xl">ACE <span class="text-slate-400 font-semibold">Clock</span></div>
+        <div class="text-[11px] text-slate-500 mt-0.5">เน้นโมดูล attendance/time</div>
+      </div>
+    </div>
+
+    <!-- 4. Stacked bars (analytics) -->
+    <div class="card p-7 pick">
+      <span class="tag">04 · Pulse</span>
+      <div class="h-28 grid place-items-center">
+        <svg width="84" height="84" viewBox="0 0 64 64" fill="none">
+          <rect x="2" y="2" width="60" height="60" rx="16" fill="#0f172a"/>
+          <path d="M10 40 L20 40 L26 24 L33 48 L40 18 L46 34 L54 34" stroke="url(#g4)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <defs><linearGradient id="g4" x1="10" y1="18" x2="54" y2="48"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#f87171"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="text-center mt-2">
+        <div class="wm text-xl">ACE <span class="text-slate-400 font-semibold">Ops</span></div>
+        <div class="text-[11px] text-slate-500 mt-0.5">heartbeat = real-time monitoring (dark)</div>
+      </div>
+    </div>
+
+    <!-- 5. Geometric AC ligature -->
+    <div class="card p-7 pick">
+      <span class="tag">05 · Arc</span>
+      <div class="h-28 grid place-items-center">
+        <svg width="84" height="84" viewBox="0 0 64 64" fill="none">
+          <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#g5)"/>
+          <path d="M44 22 A14 14 0 1 0 44 42" stroke="#fff" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M22 42 L30 22 L38 42" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <defs><linearGradient id="g5" x1="2" y1="2" x2="62" y2="62"><stop stop-color="#1d3bb8"/><stop offset="1" stop-color="#2447d8"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="text-center mt-2">
+        <div class="wm text-xl">ACE</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">A + C ligature เรียบ ๆ mono blue</div>
+      </div>
+    </div>
+
+    <!-- 6. Shield (governance/admin) -->
+    <div class="card p-7 pick">
+      <span class="tag">06 · Shield</span>
+      <div class="h-28 grid place-items-center">
+        <svg width="84" height="84" viewBox="0 0 64 64" fill="none">
+          <path d="M32 4 L54 12 V32 C54 46 44 55 32 60 C20 55 10 46 10 32 V12 Z" fill="url(#g6)"/>
+          <path d="M22 42 L32 20 L42 42" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M26.5 34 H37.5" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>
+          <defs><linearGradient id="g6" x1="10" y1="4" x2="54" y2="60"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="text-center mt-2">
+        <div class="wm text-xl">ACE <span class="text-slate-400 font-semibold">Secure</span></div>
+        <div class="text-[11px] text-slate-500 mt-0.5">shield = trust / role-based access</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Usage on backgrounds (picked #1) ===== -->
+  <h2 class="text-xl font-black mt-12 mb-4">การใช้งานจริง — ตัวอย่าง Concept 01 (A-Signal)</h2>
+  <div class="grid grid-cols-4 gap-5">
+
+    <!-- Sidebar header light -->
+    <div class="card overflow-hidden">
+      <div class="px-5 py-4 flex items-center gap-3 border-b border-slate-100">
+        <svg width="36" height="36" viewBox="0 0 64 64" fill="none"><rect x="2" y="2" width="60" height="60" rx="16" fill="url(#u1)"/><path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 36 H39" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/><circle cx="32" cy="20" r="3.4" fill="#fff"/><defs><linearGradient id="u1" x1="2" y1="2" x2="62" y2="62"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs></svg>
+        <div><div class="wm text-lg leading-none">ACE</div><div class="text-[10px] text-slate-500 uppercase tracking-widest">System 4</div></div>
+      </div>
+      <div class="p-4 text-xs text-slate-400">Sidebar header · พื้นขาว</div>
+    </div>
+
+    <!-- On gradient hero -->
+    <div class="card overflow-hidden">
+      <div class="px-5 py-6 flex items-center gap-3" style="background:linear-gradient(135deg,#2447d8,#c73b32)">
+        <svg width="36" height="36" viewBox="0 0 64 64" fill="none"><rect x="2" y="2" width="60" height="60" rx="16" fill="rgba(255,255,255,.18)"/><path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 36 H39" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/><circle cx="32" cy="20" r="3.4" fill="#fff"/></svg>
+        <div class="text-white"><div class="wm text-lg leading-none">ACE</div><div class="text-[10px] opacity-80 uppercase tracking-widest">System 4</div></div>
+      </div>
+      <div class="p-4 text-xs text-slate-400">Login hero · reversed (ขาวล้วน)</div>
+    </div>
+
+    <!-- Dark -->
+    <div class="card overflow-hidden">
+      <div class="px-5 py-6 flex items-center gap-3 bg-slate-900">
+        <svg width="36" height="36" viewBox="0 0 64 64" fill="none"><rect x="2" y="2" width="60" height="60" rx="16" fill="url(#u3)"/><path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 36 H39" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/><circle cx="32" cy="20" r="3.4" fill="#fff"/><defs><linearGradient id="u3" x1="2" y1="2" x2="62" y2="62"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#f87171"/></linearGradient></defs></svg>
+        <div class="text-white"><div class="wm text-lg leading-none">ACE</div><div class="text-[10px] text-slate-400 uppercase tracking-widest">System 4</div></div>
+      </div>
+      <div class="p-4 text-xs text-slate-400">Dark mode / Wallboard</div>
+    </div>
+
+    <!-- Favicon sizes -->
+    <div class="card p-4">
+      <div class="text-xs text-slate-400 mb-3">Favicon / app icon</div>
+      <div class="flex items-end gap-3">
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#u4)"/><path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 36 H39" stroke="#fff" stroke-width="5" stroke-linecap="round"/><defs><linearGradient id="u4" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs></svg>
+        <svg width="32" height="32" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#u5)"/><path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 36 H39" stroke="#fff" stroke-width="5" stroke-linecap="round"/><defs><linearGradient id="u5" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs></svg>
+        <svg width="48" height="48" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#u6)"/><path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 36 H39" stroke="#fff" stroke-width="5" stroke-linecap="round"/><defs><linearGradient id="u6" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs></svg>
+      </div>
+      <div class="text-[10px] text-slate-400 mt-2">16 · 32 · 48 px ยังคมชัด</div>
+    </div>
+  </div>
+
+  <!-- Horizontal lockup -->
+  <h2 class="text-xl font-black mt-12 mb-4">Horizontal lockup (full)</h2>
+  <div class="card p-8 flex items-center gap-10 flex-wrap">
+    <div class="flex items-center gap-3">
+      <svg width="48" height="48" viewBox="0 0 64 64" fill="none"><rect x="2" y="2" width="60" height="60" rx="16" fill="url(#h1)"/><path d="M20 44 L32 20 L44 44" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 36 H39" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/><circle cx="32" cy="20" r="3.4" fill="#fff"/><defs><linearGradient id="h1" x1="2" y1="2" x2="62" y2="62"><stop stop-color="#2447d8"/><stop offset="1" stop-color="#c73b32"/></linearGradient></defs></svg>
+      <div>
+        <div class="wm text-2xl leading-none">ACE <span class="font-semibold text-slate-400">System</span></div>
+        <div class="text-[11px] text-slate-500 tracking-wide mt-1">Operations Platform · RF · HR · Finance</div>
+      </div>
+    </div>
+    <div class="h-12 w-px bg-slate-200"></div>
+    <div class="text-sm text-slate-500 max-w-xs">
+      <b class="text-slate-700">Wordmark font:</b> Sora 800<br>
+      <b class="text-slate-700">Clearspace:</b> = ความสูงตัว "A" ของมาร์ค รอบทุกด้าน<br>
+      <b class="text-slate-700">Min size:</b> 16px (icon) / 90px (lockup)
+    </div>
+  </div>
+
+  <div class="text-center text-xs text-slate-400 py-10">— เลือก concept ที่ชอบ แล้วผมจะ export เป็น <span class="mono">logo.svg</span> + favicon ไปใส่ใน frontend/public/ —</div>
+</div>
+</body>
+</html>

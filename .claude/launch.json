@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dta-html",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8899",
+        "--directory",
+        "frontend"
+      ],
+      "port": 8899
+    },
+    {
+      "name": "ace-vite",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": [
+        "logs",
+        "-f",
+        "ace-system-frontend"
+      ],
+      "port": 5173
+    }
+  ]
+}

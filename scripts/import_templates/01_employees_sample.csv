@@ -1,0 +1,11 @@
+employee_code,full_name,first_name,last_name,email,phone,department,project_team,project_role,position,job_title,manager_code,status,hire_date,employment_type
+ACE-IMP001,Somchai Wongthep,Somchai,Wongthep,somchai.w@ace.co.th,0812345001,Project,RF,DTE,Field Engineer,RF Field Engineer,ACE001,ACTIVE,2024-01-15,FULL_TIME
+ACE-IMP002,Pattara Ruangsri,Pattara,Ruangsri,pattara.r@ace.co.th,0812345002,Project,RF,DTA,Senior Tech,RF Senior Technician,ACE001,ACTIVE,2023-06-01,FULL_TIME
+ACE-IMP003,Niran Boonsong,Niran,Boonsong,niran.b@ace.co.th,0812345003,Project,RF,OSS,Field Engineer,RF Field Engineer,ACE001,ACTIVE,2024-03-20,FULL_TIME
+ACE-IMP004,Wichai Phongphet,Wichai,Phongphet,wichai.p@ace.co.th,0812345004,Project,TE,Lead,Team Lead,TE Team Lead,ACE002,ACTIVE,2022-11-10,FULL_TIME
+ACE-IMP005,Suda Tantiwattana,Suda,Tantiwattana,suda.t@ace.co.th,0812345005,Project,TE,Tech,Technician,TE Technician,ACE-IMP004,ACTIVE,2024-08-05,FULL_TIME
+ACE-IMP006,Apichat Khampang,Apichat,Khampang,apichat.k@ace.co.th,0812345006,Project,TE,Tech,Technician,TE Technician,ACE-IMP004,ACTIVE,2025-01-12,FULL_TIME
+ACE-IMP007,Malee Charoen,Malee,Charoen,malee.c@ace.co.th,0812345007,HR,HR,Officer,HR Officer,HR Officer,ACE003,ACTIVE,2023-04-01,FULL_TIME
+ACE-IMP008,Kanya Sangkaew,Kanya,Sangkaew,kanya.s@ace.co.th,0812345008,Accounting,Finance,Officer,Accountant,Accountant,ACE004,ACTIVE,2024-02-19,FULL_TIME
+ACE-IMP009,Thawatchai Inthorn,Thawatchai,Inthorn,thawatchai.i@ace.co.th,0812345009,AI,AI,Engineer,AI Engineer,AI Engineer,ACE005,ACTIVE,2025-03-10,FULL_TIME
+ACE-IMP010,Pranee Sukphan,Pranee,Sukphan,pranee.s@ace.co.th,0812345010,Project,RF,DTE,Field Engineer,RF Field Engineer,ACE001,ACTIVE,2024-07-22,FULL_TIME

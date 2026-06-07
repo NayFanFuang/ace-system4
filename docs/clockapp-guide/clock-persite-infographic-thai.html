@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACE ClockApp - Clock In/Out PER-SITE</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #e9eef5;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: #0f172a;
+    }
+    .poster {
+      width: 1240px;
+      height: 1754px;
+      margin: 0 auto;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 6% 8%, rgba(124,58,237,.16), transparent 28%),
+        radial-gradient(circle at 92% 4%, rgba(192,57,43,.16), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+      padding: 40px 54px 44px;
+    }
+    .hero {
+      border-radius: 28px;
+      padding: 30px 38px;
+      color: #fff;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 48%, #c0392b 100%);
+      box-shadow: 0 22px 60px rgba(79,70,229,.22);
+    }
+    .kicker {
+      display: inline-flex;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      font-size: 19px;
+      font-weight: 850;
+    }
+    h1 {
+      margin: 18px 0 10px;
+      font-size: 48px;
+      line-height: 1.05;
+      letter-spacing: -1px;
+    }
+    .subtitle {
+      font-size: 23px;
+      line-height: 1.45;
+      color: rgba(255,255,255,.9);
+      font-weight: 650;
+    }
+    .flow {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .card {
+      min-height: 512px;
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 18px 46px rgba(15,23,42,.09);
+      overflow: hidden;
+    }
+    .card-head {
+      min-height: 164px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid #edf1f7;
+    }
+    .step {
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      background: #7c3aed;
+      color: #fff;
+      font-size: 23px;
+      font-weight: 950;
+      margin-bottom: 10px;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.15;
+    }
+    .card p {
+      margin: 0;
+      color: #64748b;
+      font-size: 15.5px;
+      line-height: 1.38;
+      font-weight: 650;
+    }
+    .phone-wrap {
+      height: 348px;
+      display: flex;
+      align-items: start;
+      justify-content: center;
+      padding: 14px;
+      background: linear-gradient(180deg, #f8fafc, #eef2f7);
+    }
+    .phone {
+      width: 158px;
+      height: 342px;
+      border-radius: 22px;
+      object-fit: cover;
+      object-position: top center;
+      border: 6px solid #111827;
+      box-shadow: 0 16px 36px rgba(15,23,42,.24);
+      background: #111827;
+    }
+    .phone.mid { object-position: center center; }
+    .note-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 22px;
+    }
+    .note {
+      border-radius: 22px;
+      padding: 22px 26px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 40px rgba(15,23,42,.07);
+    }
+    .note h3 {
+      margin: 0 0 14px;
+      font-size: 26px;
+    }
+    .note ul {
+      margin: 0;
+      padding-left: 24px;
+      color: #334155;
+      font-size: 19px;
+      line-height: 1.46;
+      font-weight: 650;
+    }
+    .tips {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .tip {
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      color: #475569;
+      font-size: 16.5px;
+      line-height: 1.42;
+      font-weight: 700;
+    }
+    .tip strong {
+      display: block;
+      color: #0f172a;
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    .contact-band {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 1fr 190px;
+      gap: 18px;
+      align-items: center;
+      border-radius: 22px;
+      background: #fff;
+      border: 1px solid #dfe6f0;
+      box-shadow: 0 16px 40px rgba(15,23,42,.07);
+      padding: 18px 24px;
+    }
+    .contact-band h3 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+    .contact-band p {
+      margin: 0;
+      color: #475569;
+      font-size: 17px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+    .contact-meta {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #f3e8ff;
+      color: #7c3aed;
+      padding: 7px 12px;
+      font-size: 14.5px;
+      font-weight: 900;
+    }
+    .qr-box {
+      justify-self: end;
+      text-align: center;
+    }
+    .qr-box img {
+      width: 132px;
+      height: 132px;
+      border-radius: 16px;
+      border: 8px solid #f8fafc;
+      box-shadow: 0 10px 24px rgba(15,23,42,.12);
+      background: #fff;
+    }
+    .qr-box div {
+      margin-top: 8px;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .footer {
+      margin-top: 22px;
+      padding: 22px 30px;
+      border-radius: 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #111827;
+      color: #e5e7eb;
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .badge {
+      color: #fff;
+      background: #7c3aed;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 18px;
+      font-weight: 900;
+    }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <section class="hero">
+      <div class="kicker">ACE ClockApp คู่มือใช้งาน</div>
+      <h1>Clock In / Clock Out PER-SITE</h1>
+      <div class="subtitle">
+        สำหรับ DTE / งานราย Site ใช้เปิดวันทำงาน เลือก Site ที่ได้รับมอบหมาย
+        Start Site และปิดงานด้วย Complete, Stop หรือ Issue
+      </div>
+    </section>
+
+    <section class="flow">
+      <article class="card">
+        <div class="card-head">
+          <div class="step">1</div>
+          <h3>Clock In เปิดวันทำงาน</h3>
+          <p>หลัง Login ให้เปิด GPS แล้วกด Clock In เพื่อเริ่มวันของ DTE ก่อนเลือก Site</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone" src="persite-01-dashboard-before.png" alt="Per-site dashboard before day clock-in">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">2</div>
+          <h3>เลือก Planned Site</h3>
+          <p>เลือก Site จาก My Planned Sites หรือ Select Site to Start และตรวจระยะ GPS</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone" src="persite-02-select-site.png" alt="Per-site select planned site">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">3</div>
+          <h3>Start Site / ปิดงาน</h3>
+          <p>กด Start Site เพื่อเริ่มงาน Site แล้วปิดด้วย Complete, Stop หรือ Issue ตามผลหน้างาน</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone mid" src="persite-03-active-site.png" alt="Per-site start site and complete options">
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="step">4</div>
+          <h3>ตรวจ History / Export</h3>
+          <p>ตรวจประวัติราย Site, เวลา, สถานะ และ Export CSV เมื่อใช้เป็นหลักฐาน</p>
+        </div>
+        <div class="phone-wrap">
+          <img class="phone" src="persite-04-history.png" alt="Per-site history and export">
+        </div>
+      </article>
+    </section>
+
+    <section class="note-grid">
+      <div class="note">
+        <h3>ลำดับใช้งาน Per-Site</h3>
+        <ul>
+          <li>Login และอนุญาต Location / Camera</li>
+          <li>กด Clock In เพื่อเปิดวันทำงาน</li>
+          <li>เลือก Site ที่ได้รับมอบหมาย</li>
+          <li>ตรวจว่า GPS อยู่ในระยะที่กำหนด</li>
+          <li>กด Start Site เมื่อเริ่มงานจริง</li>
+          <li>ปิดงานด้วย Complete, Stop หรือ Issue</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>จุดที่ต้องระวัง</h3>
+        <ul>
+          <li>ต้อง Clock In เปิดวันก่อน จึงจะ Start Site ได้</li>
+          <li>เลือก Site ให้ถูกก่อนกด Start Site</li>
+          <li>ถ้าอยู่นอกรัศมี ระบบอาจไม่ให้เริ่ม Site</li>
+          <li>เลือกผลปิดงานให้ตรง: Complete, Stop หรือ Issue</li>
+          <li>ถ้าลืมปิด Site ให้แจ้งหัวหน้างานหรือ Admin</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="tips">
+      <div class="tip"><strong>Clock In</strong>เปิดวันทำงานของ DTE และยืนยันตัวตนก่อนเริ่ม Site แรก</div>
+      <div class="tip"><strong>Start Site</strong>เริ่มจับเวลางานของ Site ที่เลือก สามารถมีหลาย Site ต่อวันได้</div>
+      <div class="tip"><strong>Complete / Stop / Issue</strong>ใช้ปิดงานราย Site ตามผลจริง เพื่อให้รายงานและประวัติถูกต้อง</div>
+    </section>
+
+    <section class="contact-band">
+      <div>
+        <h3>สแกนเพื่อเข้าใช้งาน ClockApp</h3>
+        <p>เปิดผ่านมือถือเพื่อใช้งาน GPS, Camera และการตรวจระยะ Site ได้สมบูรณ์</p>
+        <div class="contact-meta">
+          <span class="pill">ผู้ออกแบบ / ติดต่อ: Peerapol Pianmsri</span>
+          <span class="pill">Link: ace.airconnect-e.com/ClockApp</span>
+          <span class="pill">อัปเดต: 2026-06-02</span>
+        </div>
+      </div>
+      <div class="qr-box">
+        <img src="clockapp-qr.png" alt="QR Code for ACE ClockApp">
+        <div>Scan QR</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Airconnect Engineering (Thailand) Co., Ltd. | ACE Clock System 2.0</span>
+      <span class="badge">Per-Site Clock Guide</span>
+    </footer>
+  </main>
+</body>
+</html>

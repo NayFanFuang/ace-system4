@@ -9,11 +9,13 @@ import os
 import sys
 import posixpath
 import paramiko
+from deploy_env import load_deploy_creds
 
-HOST     = "203.159.92.191"
-PORT     = 22020
-USER     = "pn_deploy"
-PASSWORD = "Pn2026Aa!"
+_creds   = load_deploy_creds()
+HOST     = _creds["host"]
+PORT     = _creds["port"]
+USER     = _creds["user"]
+PASSWORD = _creds["password"]
 REMOTE_DIR = "/home/pn_deploy/ace_system4/migrations"
 CONTAINER  = "ace-system-postgres"
 PG_USER    = "ace_user"

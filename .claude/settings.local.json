@@ -312,7 +312,9 @@
       "Bash(node tools/office_reachability_check.mjs)",
       "Bash(curl -s http://localhost:8000/api/billing-plan -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(curl -s -X PUT http://localhost:8000/api/billing-plan -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"ace_project_code\":\"HWT2601\",\"month\":\"2026-05\",\"planned_amount\":50000,\"vendor\":\"HW\"}')",
-      "PowerShell($f = 'C:\\\\GoogleAppScript\\\\0_NewServer\\\\ACE_System4\\\\frontend\\\\VirtualOfficePage.jsx'; $l = Get-Content $f; \\($l[0..841] + $l[952..\\($l.Count-1\\)]\\) | Set-Content -Encoding utf8 $f; \"lines now: $\\(\\(Get-Content $f\\).Count\\)\")"
+      "PowerShell($f = 'C:\\\\GoogleAppScript\\\\0_NewServer\\\\ACE_System4\\\\frontend\\\\VirtualOfficePage.jsx'; $l = Get-Content $f; \\($l[0..841] + $l[952..\\($l.Count-1\\)]\\) | Set-Content -Encoding utf8 $f; \"lines now: $\\(\\(Get-Content $f\\).Count\\)\")",
+      "Bash(python -c \"from deploy_env import load_deploy_creds; c=load_deploy_creds\\(\\); print\\('host:',c['host']\\); print\\('port:',c['port']\\); print\\('user:',c['user']\\); print\\('password loaded:', 'YES' if c['password'] else 'NO'\\)\")",
+      "Bash(python -m py_compile deploy.py deploy_frontend.py deploy_migration.py deploy_env.py)"
     ]
   }
 }

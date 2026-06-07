@@ -1,8 +1,10 @@
 import paramiko, io, os, tarfile, time
+from deploy_env import load_deploy_creds
 
+_c = load_deploy_creds()
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('203.159.92.191', port=22020, username='pn_deploy', password='Pn2026Aa!', timeout=15)
+ssh.connect(_c["host"], port=_c["port"], username=_c["user"], password=_c["password"], timeout=15)
 
 def run(cmd):
     _, o, e = ssh.exec_command(cmd, timeout=300)

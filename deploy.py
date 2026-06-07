@@ -4,11 +4,13 @@ Usage: python deploy.py
 """
 import os, sys, tarfile, io, stat
 import paramiko
+from deploy_env import load_deploy_creds
 
-HOST     = "203.159.92.191"
-PORT     = 22020
-USER     = "pn_deploy"
-PASSWORD = "Pn2026Aa!"
+_creds   = load_deploy_creds()
+HOST     = _creds["host"]
+PORT     = _creds["port"]
+USER     = _creds["user"]
+PASSWORD = _creds["password"]
 REMOTE   = "/home/pn_deploy/ace_system4"
 LOCAL    = r"C:\GoogleAppScript\0_NewServer\ACE_System4"
 

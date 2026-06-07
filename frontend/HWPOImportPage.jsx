@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   Activity, ArrowUpRight, ArrowDownRight,
   Bell, CalendarDays, ChevronDown, ChevronRight,
-  Command, FileSpreadsheet, FileUp, Home, LogOut, Menu, RefreshCw, Search,
-  Sparkles, Upload, Database, Eye, X, MapPin, FileText, LayoutGrid,
+  Command, FileUp, Home, LogOut, Menu, RefreshCw, Search,
+  Sparkles, Upload, X, LayoutGrid,
 } from 'lucide-react'
 import { apiFetch } from './src/apiFetch.js'
 
@@ -976,67 +976,16 @@ function OverviewTab() {
 // ─── Main Page ───────────────────────────────────────────────
 export default function HWPOImportPage({ authenticatedUser, onLogout }) {
   const [tab, setTab]                   = useState('overview')
-  const [projects, setProjects]         = useState([])
-  const [selectedProject, setSelected]  = useState(null)
-  const [aceFilter, setAceFilter]       = useState(null)
-  const [aceCounts, setAceCounts]       = useState({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const user = authenticatedUser || {}
 
-  function selectProject(code) { setSelected(code); setAceFilter(null) }
-  function selectAce(ace_code, typeObj) {
-    setAceFilter({ ace_code, type: typeObj.type, label: typeObj.label, match: typeObj.match })
-    setSelected(null)
-  }
-
-  useEffect(() => {
-    if (tab !== 'view') return
-    Promise.all([
-      apiFetch('/api/projects').then(r => r.json()),
-      apiFetch('/api/project-pos').then(r => r.json()),
-    ]).then(([projData, poData]) => {
-      const projMap = {}
-      ;(projData.data || []).forEach(p => { projMap[p.project_code] = p.project_name || p.name || p.project_code })
-
-      const hwPos = (poData.data || []).filter(p => p.hw_data)
-
-      const counts = {}
-      hwPos.forEach(p => { if (p.project_code) counts[p.project_code] = (counts[p.project_code]||0)+1 })
-      const list = Object.keys(counts)
-        .sort((a, b) => (counts[b]||0) - (counts[a]||0))
-        .map(code => ({ code, name: projMap[code] || code, po_count: counts[code] || 0 }))
-      setProjects(list)
-      if (list.length > 0 && !selectedProject && !aceFilter) setSelected(list[0].code)
-
-      const ac = {}
-      ACE_PROJECT_RULES.forEach(rule => {
-        rule.types.forEach(t => {
-          const key = `${rule.ace_code}|${t.type}`
-          ac[key] = hwPos.filter(p => matchAce(p, rule.ace_code, t)).length
-        })
-      })
-      setAceCounts(ac)
-    }).catch(() => {})
-  }, [tab])
-
-  const totalHw    = useMemo(() => Object.values(aceCounts).reduce((s, n) => s + (n || 0), 0), [aceCounts])
-  const ssvTotal   = useMemo(() => Object.entries(aceCounts).filter(([k]) => k.endsWith('|SSV')).reduce((s, [, n]) => s + (n || 0), 0), [aceCounts])
-  const pacTotal   = useMemo(() => Object.entries(aceCounts).filter(([k]) => k.endsWith('|PAC')).reduce((s, [, n]) => s + (n || 0), 0), [aceCounts])
-
   const pageTitle = tab === 'overview'
     ? 'PO Overview — by ACE Project'
-    : tab === 'import'
-    ? 'Import HW PO System'
-    : aceFilter ? `${aceFilter.ace_code} — ${aceFilter.label}`
-    : selectedProject ? `View PO — ${selectedProject}`
-    : 'View PO by Project'
+    : 'Import HW PO System'
 
   const pageSub = tab === 'overview'
     ? 'Each PO is assigned to an ACE Project'
-    : tab === 'import'
-    ? 'Supports HW Format · "PO 2026.xlsx" and similar layouts · Auto duplicate detection'
-    : aceFilter ? `ACE Project ${aceFilter.ace_code} · Work type ${aceFilter.label}`
-    : (projects.find(p => p.code === selectedProject)?.name || 'Select a project from the left menu to view POs')
+    : 'Supports HW Format · "PO 2026.xlsx" and similar layouts · Auto duplicate detection'
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-950">
@@ -1044,12 +993,6 @@ export default function HWPOImportPage({ authenticatedUser, onLogout }) {
         <FinanceSidebar
           tab={tab}
           setTab={setTab}
-          aceFilter={aceFilter}
-          selectAce={selectAce}
-          aceCounts={aceCounts}
-          selectedProject={selectedProject}
-          selectProject={selectProject}
-          projects={projects}
           mobileOpen={mobileMenuOpen}
           onMobileClose={() => setMobileMenuOpen(false)}
         />
@@ -1073,7 +1016,7 @@ export default function HWPOImportPage({ authenticatedUser, onLogout }) {
               <div className="hidden min-w-0 flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-400 md:flex">
                 <Search size={18} />
                 <span className="w-full text-sm font-semibold uppercase tracking-[.08em] text-slate-400">
-                  Finance · HW PO {tab === 'import' ? 'Import' : 'Viewer'}
+                  Finance · HW PO {tab === 'import' ? 'Import' : 'Overview'}
                 </span>
               </div>
               <div className="ml-auto flex items-center gap-2">
@@ -1122,23 +1065,9 @@ export default function HWPOImportPage({ authenticatedUser, onLogout }) {
               </div>
             </div>
 
-            {/* View tab metric cards */}
-            {tab === 'view' && totalHw > 0 && (
-              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="TOTAL HW PO"  value={totalHw}          helper="HW Format · mapped"        tone={ACE_BLUE}  icon={FileSpreadsheet} />
-                <StatCard label="TOTAL SSV"    value={ssvTotal}         helper="Single Site Verification"  tone="#16a34a"   icon={MapPin} />
-                <StatCard label="TOTAL PAC"    value={pacTotal}         helper="SSOA / Cluster"            tone="#7c3aed"   icon={Database} />
-                <StatCard label="HW PROJECTS"  value={projects.length}  helper="Project codes in file"     tone="#0891b2"   icon={FileText} />
-              </section>
-            )}
-
             {/* Tab content */}
             <section>
-              {tab === 'overview'
-                ? <OverviewTab />
-                : tab === 'import'
-                ? <ImportTab />
-                : <ViewTab selectedProject={selectedProject} aceFilter={aceFilter} />}
+              {tab === 'overview' ? <OverviewTab /> : <ImportTab />}
             </section>
           </div>
         </main>

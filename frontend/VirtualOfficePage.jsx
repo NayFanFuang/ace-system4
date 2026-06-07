@@ -625,6 +625,7 @@ function calcVolume(me, myRoom, p) {
 const rrect = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r) }
 const ISO = { kx: 0.7, ky: 0.35, kz: 0.7 }
 const WALL_H = 36
+const ZOOM = 0.72 // <1 = whole scene drawn smaller (zoomed out), so more of the map fits
 const isoP = (wx, wy, z, off) => ({ x: (wx - wy) * ISO.kx + off.x, y: (wx + wy) * ISO.ky - z * ISO.kz + off.y })
 
 function roomAtTile(tx, ty) {
@@ -655,11 +656,16 @@ function fillQuad(ctx, it, off, color) {
 
 function render(ctx, canvas, G, me) {
   const cw = canvas.width, ch = canvas.height
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.fillStyle = '#0c111b'; ctx.fillRect(0, 0, cw, ch)
+  // zoom out around the canvas centre — everything (floors, walls, furniture, people) scales together
+  ctx.translate(cw / 2, ch / 2); ctx.scale(ZOOM, ZOOM); ctx.translate(-cw / 2, -ch / 2)
   const ref = me || { x: MAP_W * TILE / 2, y: MAP_H * TILE / 2 }
   const c0 = isoP(ref.x, ref.y, 0, { x: 0, y: 0 })
   const off = { x: cw / 2 - c0.x, y: ch / 2 - c0.y + 40 }
-  const vis = (sx, sy, m = 160) => sx > -m && sx < cw + m && sy > -m && sy < ch + m
+  // zoom shows more world than the raw canvas, so widen the cull bounds by 1/ZOOM
+  const exX = (cw / 2) * (1 / ZOOM - 1), exY = (ch / 2) * (1 / ZOOM - 1)
+  const vis = (sx, sy, m = 160) => sx > -m - exX && sx < cw + m + exX && sy > -m - exY && sy < ch + m + exY
 
   // 1) floor tiles (diamonds)
   for (let ty = 0; ty < MAP_H; ty++) for (let tx = 0; tx < MAP_W; tx++) {
@@ -726,6 +732,7 @@ function render(ctx, canvas, G, me) {
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.strokeText(r.name, cp.x, cp.y)
     ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillText(r.name, cp.x, cp.y)
   }
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
 }
 
 const FURN_H = { desk: 12, cabinet: 20, reception: 15, counter: 17, mtable: 12, rtable: 11, monitor: 17, chair: 13, sofa: 13, ctable: 7, plant: 22, rack: 30, fridge: 33, watercooler: 19, screen: 20, tv: 20 }

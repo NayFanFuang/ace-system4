@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps import ROLE_LABELS, ROLE_SCOPES, get_current_user, require_hr_read_user, require_hr_user, require_project_user, require_self_or_admin
+from app.deps import ROLE_LABELS, ROLE_SCOPES, get_current_user, require_finance_or_project_user, require_hr_read_user, require_hr_user, require_project_user, require_self_or_admin
 from app.models.auth_user import AuthUser
 from app.models.clock import ClockSite, ClockSession
 from app.models.employee import Employee, EmployeeRelocation, HWImportLog, ProjectAssignment, ProjectCatalog, ProjectPO, ProjectSite
@@ -99,6 +99,8 @@ PROJECT_PO_COLUMNS = {
     "hw_status_changed_at": "TIMESTAMP WITH TIME ZONE",
     "hw_prev_status": "VARCHAR(40)",
     "hw_first_seen_at": "TIMESTAMP WITH TIME ZONE",
+    "hw_evidence_url": "VARCHAR(500)",
+    "hw_evidence_confirmed_at": "TIMESTAMP WITH TIME ZONE",
     "ac1_plan_month": "VARCHAR(7)",
     "ac1_billed_at": "TIMESTAMP WITH TIME ZONE",
     "ac1_invoice_no": "VARCHAR(80)",
@@ -1765,7 +1767,7 @@ async def patch_project(
 @router.get("/projects")
 async def list_projects(
     team: str = Query(""),
-    payload: dict = Depends(require_project_user),
+    payload: dict = Depends(require_finance_or_project_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(ProjectCatalog)
@@ -2013,7 +2015,7 @@ async def list_all_sites(
 @router.post("/sites/import-masterdb")
 async def import_masterdb_sites(
     request: Request,
-    payload: dict = Depends(require_project_user),
+    payload: dict = Depends(require_finance_or_project_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Import Site ID sheet from MasterDB xlsx → upsert project_sites (site_code, lat, lng, province)"""
@@ -2106,7 +2108,7 @@ async def import_masterdb_sites(
 @router.post("/sites/import-rollout-plan")
 async def import_rollout_plan(
     request: Request,
-    payload: dict = Depends(require_project_user),
+    payload: dict = Depends(require_finance_or_project_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Import ISDP rollout plan (.xlsm) → update project_sites from Sheet 'Site Rollout Plan'
@@ -2117,7 +2119,6 @@ async def import_rollout_plan(
     DU-ID-style value (e.g. "RYG7235_Flash_RAN_EAS R3") can still be looked up to
     the canonical RF Cluster Name (e.g. "EAS-FLASH-0012")."""
     import io
-    import openpyxl
     from datetime import date as date_type
 
     form   = await request.form()
@@ -2126,22 +2127,44 @@ async def import_rollout_plan(
         raise HTTPException(400, "ต้องแนบไฟล์ (.xlsx / .xlsm)")
 
     content = await upload.read()
+
+    # Parse with python-calamine (Rust) — ~8x faster than openpyxl on large ISDP
+    # files (100k+ rows): ~32s → ~4s. Falls back to openpyxl if calamine is
+    # unavailable. Both branches yield `data_rows` as a list of cell-lists with
+    # data starting at sheet row 4 (rows 1-3 are headers).
+    SHEET = "Site Rollout Plan"
+    data_rows: list = []
     try:
-        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        from python_calamine import CalamineWorkbook
+        cwb = CalamineWorkbook.from_filelike(io.BytesIO(content))
+        if SHEET not in cwb.sheet_names:
+            raise HTTPException(400, f"ไม่พบ Sheet '{SHEET}'")
+        all_rows = cwb.get_sheet_by_name(SHEET).to_python(skip_empty_area=False)
+        data_rows = all_rows[3:]
+    except HTTPException:
+        raise
     except Exception:
-        raise HTTPException(400, "ไม่สามารถอ่านไฟล์ได้")
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            if SHEET not in wb.sheetnames:
+                raise HTTPException(400, f"ไม่พบ Sheet '{SHEET}'")
+            ws = wb[SHEET]
+            data_rows = [list(r) for r in ws.iter_rows(min_row=4, max_col=15, values_only=True)]
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, "ไม่สามารถอ่านไฟล์ได้")
 
-    if "Site Rollout Plan" not in wb.sheetnames:
-        raise HTTPException(400, "ไม่พบ Sheet 'Site Rollout Plan'")
-
-    ws = wb["Site Rollout Plan"]
-    # Row 1-3 = headers, data from row 4
-    # Col B(1)=Site Code, Col C(2)=DU ID, Col I(8)=RF Cluster Name, Col K(10)=Cluster Ready, Col O(14)=Full On-Air
+    # Col B(1)=Site Code, Col C(2)=DU ID, Col E/F(4/5)=Lat/Lng,
+    # Col I(8)=RF Cluster Name, Col K(10)=Cluster Ready, Col L(11)=Owner, Col O(14)=Full On-Air
+    def _g(row, idx):
+        return row[idx] if idx < len(row) else None
 
     def _to_date(val) -> date_type | None:
-        if val is None:
+        if val is None or val == "":
             return None
-        if hasattr(val, "date"):
+        if isinstance(val, datetime):
             return val.date()
         if isinstance(val, date_type):
             return val
@@ -2150,33 +2173,36 @@ async def import_rollout_plan(
         except Exception:
             return None
 
+    def _to_float(v):
+        try:
+            f = float(v)
+            return f if -90 <= f <= 180 and f != 0 else None
+        except (TypeError, ValueError):
+            return None
+
     # Collect per site: max full_on_air, max cluster_ready, last rf_cluster_name
     # Col B may contain multiple space-separated site codes for cluster rows → apply to each
     # Col C carries the DU ID (e.g. "RYG7235_Flash_RAN_EAS R3"); we ALSO store it
     # as a site_code so PAC POs whose cluster_site holds a DU-ID-style value can be
     # resolved to their RF Cluster Name (Col I).
     site_data: dict[str, dict] = {}
-    for row in ws.iter_rows(min_row=4, max_col=15, values_only=True):
-        raw_site = row[1]
-        raw_du   = row[2]
+    for row in data_rows:
+        raw_site = _g(row, 1)
+        raw_du   = _g(row, 2)
         if not raw_site and not raw_du:
             continue
-        rf_name  = str(row[8]).strip() if row[8] else None
-        cl_ready = _to_date(row[10])
-        owner    = str(row[11]).strip() if row[11] else None   # Col L = Owner
-        on_air   = _to_date(row[14])
+        _rf = _g(row, 8)
+        rf_name  = str(_rf).strip() if _rf else None
+        cl_ready = _to_date(_g(row, 10))
+        _owner = _g(row, 11)
+        owner    = str(_owner).strip() if _owner else None   # Col L = Owner
+        on_air   = _to_date(_g(row, 14))
 
         # Col E/F = Common Site Latitude/Longitude — the ONLY coord source for
         # full-name DU-ID sites (e.g. "RYG7343_Relocate_East R3") which don't
         # exist in MasterDB. Used to plot SSV/PAC sites on the map.
-        def _to_float(v):
-            try:
-                f = float(v)
-                return f if -90 <= f <= 180 and f != 0 else None
-            except (TypeError, ValueError):
-                return None
-        lat = _to_float(row[4])
-        lng = _to_float(row[5])
+        lat = _to_float(_g(row, 4))
+        lng = _to_float(_g(row, 5))
 
         tokens: list[str] = []
         if raw_site:
@@ -2334,7 +2360,7 @@ async def list_project_pos(
     project_code: str = Query(""),
     ace_project_code: str = Query(""),
     work_type: str = Query(""),
-    payload: dict = Depends(require_project_user),
+    payload: dict = Depends(require_finance_or_project_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(ProjectPO)
@@ -2360,7 +2386,7 @@ class ReassignAceIn(BaseModel):
 @router.post("/project-pos/reassign-ace-project")
 async def reassign_ace_project(
     body: ReassignAceIn,
-    payload: dict = Depends(require_project_user),
+    payload: dict = Depends(require_finance_or_project_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Bulk move PO lines to a different ACE project_code (manual override).
@@ -2601,7 +2627,7 @@ def _build_hw_mapping(headers: list[str]) -> tuple[dict, dict]:
 async def import_project_pos_hw(
     request: Request,
     dry_run: bool = Query(False),
-    payload: dict = Depends(require_project_user),
+    payload: dict = Depends(require_finance_or_project_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Import PO จากไฟล์ HW format. Column matching is name-based + alias +
@@ -2612,47 +2638,63 @@ async def import_project_pos_hw(
 
     form = await request.form()
     upload = form.get("file")
-    if not upload or not hasattr(upload, "read"):
-        raise HTTPException(400, "ต้องแนบไฟล์ Excel (.xlsx)")
+    ev_upload_early = form.get("evidence_zip")
+    has_excel    = bool(upload and hasattr(upload, "read") and getattr(upload, "filename", ""))
+    has_evidence = bool(ev_upload_early and hasattr(ev_upload_early, "read") and getattr(ev_upload_early, "filename", ""))
+    if not has_excel and not has_evidence:
+        raise HTTPException(400, "ต้องแนบไฟล์ Excel (.xlsx) หรือ Evidence ZIP อย่างน้อย 1 ไฟล์")
 
     # Optional: force every imported PO to a specific ACE project (override the
     # item-prefix rule). Used when importing per-project tracking files.
     force_ace = (form.get("force_ace_project") or "").strip().upper() or None
 
-    content = await upload.read()
-    try:
-        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-    except Exception:
-        raise HTTPException(400, "ไม่สามารถอ่านไฟล์ได้ — ต้องเป็น .xlsx เท่านั้น")
-
-    # Pick the sheet that best matches the HW PO format — score each by how many
-    # known HW columns it has, require 'po no'. Robust for multi-sheet workbooks
-    # where several sheets contain a 'PO No.' column.
-    ws = wb.active
-    best_score = -1
-    for cand in wb.worksheets:
+    content = b""
+    wb = None
+    if has_excel:
+        content = await upload.read()
         try:
-            hrow = next(cand.iter_rows(min_row=1, max_row=1, values_only=True))
-        except StopIteration:
-            continue
-        norm = {_norm_hdr(v) for v in hrow if v is not None}
-        if "po no" not in norm:
-            continue
-        score = sum(1 for k in HW_HEADER_ALIASES if k in norm)
-        if score > best_score:
-            best_score = score
-            ws = cand
+            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        except Exception:
+            raise HTTPException(400, "ไม่สามารถอ่านไฟล์ได้ — ต้องเป็น .xlsx เท่านั้น")
 
-    headers_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
-    headers = [str(v).strip() if v is not None else "" for v in headers_row]
+    # When no Excel is provided (evidence-only mode), skip xlsx parsing — set
+    # safe defaults so the rest of the function (which references ws/headers/
+    # col_idx/mapping_report) is short-circuited.
+    ws = None
+    headers: list[str] = []
+    col_idx: dict = {}
+    mapping_report: dict = {"matched": [], "missing_fields": [], "required_missing": [], "duplicate_headers": [], "ok": True}
+    acc_date_idx: int | None = None
 
-    col_idx, mapping_report = _build_hw_mapping(headers)
-    acc_date_idx: int | None = next(
-        (i for i, h in enumerate(headers) if _norm_hdr(h) == "acceptance date"), None
-    )
+    if has_excel:
+        # Pick the sheet that best matches the HW PO format — score each by how many
+        # known HW columns it has, require 'po no'. Robust for multi-sheet workbooks
+        # where several sheets contain a 'PO No.' column.
+        ws = wb.active
+        best_score = -1
+        for cand in wb.worksheets:
+            try:
+                hrow = next(cand.iter_rows(min_row=1, max_row=1, values_only=True))
+            except StopIteration:
+                continue
+            norm = {_norm_hdr(v) for v in hrow if v is not None}
+            if "po no" not in norm:
+                continue
+            score = sum(1 for k in HW_HEADER_ALIASES if k in norm)
+            if score > best_score:
+                best_score = score
+                ws = cand
 
-    if "po_number" not in col_idx:
-        raise HTTPException(400, "ไม่พบคอลัมน์ 'PO NO.' — กรุณาตรวจสอบว่าเป็น HW format")
+        headers_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+        headers = [str(v).strip() if v is not None else "" for v in headers_row]
+
+        col_idx, mapping_report = _build_hw_mapping(headers)
+        acc_date_idx = next(
+            (i for i, h in enumerate(headers) if _norm_hdr(h) == "acceptance date"), None
+        )
+
+        if "po_number" not in col_idx:
+            raise HTTPException(400, "ไม่พบคอลัมน์ 'PO NO.' — กรุณาตรวจสอบว่าเป็น HW format")
 
     # Existing records by hw_id → (db_id, current hw_po_status)
     existing_by_hw_id: dict[str, tuple[int, str | None]] = {
@@ -2722,7 +2764,8 @@ async def import_project_pos_hw(
             return "100"
         return None
 
-    for row_idx, row_values in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+    _rows_iter = enumerate(ws.iter_rows(min_row=2, values_only=True), start=2) if (has_excel and ws is not None) else iter([])
+    for row_idx, row_values in _rows_iter:
         po_number = _cell(row_values, "po_number")
         if not po_number or po_number.lower() in ("none", ""):
             continue
@@ -2840,6 +2883,91 @@ async def import_project_pos_hw(
     if not dry_run:
         if imported or updated:
             await db.commit()
+
+    # ── Optional: attach PDF evidence ZIP ──────────────────────────────────
+    # Form field `evidence_zip` (multipart, .zip) — each PDF inside should
+    # contain a PO No. matching ProjectPO.po_number (pattern: 1051HG\d+-\d+).
+    # On match: save PDF to /app/po_evidence/{po_number}.pdf and update
+    # hw_evidence_url + hw_evidence_confirmed_at on ALL lines of that PO.
+    evidence_attached: list[dict] = []
+    evidence_unmatched: list[dict] = []
+    evidence_errors: list[dict] = []
+    ev_upload = form.get("evidence_zip")
+    if ev_upload and hasattr(ev_upload, "read") and getattr(ev_upload, "filename", ""):
+        import io as _io, re as _re, zipfile
+        from pathlib import Path
+        try:
+            import fitz  # PyMuPDF
+        except ImportError:
+            raise HTTPException(500, "PyMuPDF (fitz) is not installed in the backend.")
+
+        PO_PATTERN = _re.compile(r"\b1051HG\d+-\d+\b")
+        EVIDENCE_DIR = Path("/app/po_evidence")
+        EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+
+        ev_bytes = await ev_upload.read()
+        try:
+            zf = zipfile.ZipFile(_io.BytesIO(ev_bytes))
+        except zipfile.BadZipFile:
+            raise HTTPException(400, "Evidence file ต้องเป็น .zip ที่ valid")
+
+        # Snapshot existing PO numbers in DB after the import commit
+        existing_po_numbers: set[str] = {
+            r[0]
+            for r in (await db.execute(select(ProjectPO.po_number).distinct())).all()
+        }
+
+        now_ts = datetime.now(timezone.utc)
+        for member in zf.namelist():
+            if member.endswith("/") or not member.lower().endswith(".pdf"):
+                continue
+            try:
+                pdf_bytes = zf.read(member)
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                page_text = doc[0].get_text() if len(doc) > 0 else ""
+                doc.close()
+
+                matches = PO_PATTERN.findall(page_text)
+                if not matches:
+                    evidence_unmatched.append({
+                        "file": member, "reason": "PO No. ไม่พบใน PDF",
+                    })
+                    continue
+
+                po_no = matches[0]
+                if po_no not in existing_po_numbers:
+                    evidence_unmatched.append({
+                        "file": member, "po_no": po_no,
+                        "reason": "PO No. ไม่มีใน DB",
+                    })
+                    continue
+
+                # Save PDF to disk (overwrites if same po_number reuploaded)
+                safe_name = _re.sub(r"[^A-Za-z0-9_.-]", "_", po_no) + ".pdf"
+                target_path = EVIDENCE_DIR / safe_name
+                if not dry_run:
+                    target_path.write_bytes(pdf_bytes)
+                    evidence_url = f"/api/project-pos/evidence/{po_no}"
+                    await db.execute(
+                        update(ProjectPO)
+                        .where(ProjectPO.po_number == po_no)
+                        .values(
+                            hw_evidence_url=evidence_url,
+                            hw_evidence_confirmed_at=now_ts,
+                        )
+                    )
+                evidence_attached.append({
+                    "file": member, "po_no": po_no,
+                    "url": f"/api/project-pos/evidence/{po_no}",
+                    "size_kb": round(len(pdf_bytes) / 1024, 1),
+                })
+            except Exception as exc:
+                evidence_errors.append({"file": member, "error": str(exc)})
+
+        if not dry_run and evidence_attached:
+            await db.commit()
+
+    if not dry_run:
         # Save import log (only on real import)
         log = HWImportLog(
             file_name=getattr(upload, "filename", None),
@@ -2882,12 +3010,39 @@ async def import_project_pos_hw(
         "updated_rows": updated,
         "skipped_rows": skipped,
         "error_rows": errors,
+        "evidence_attached": len(evidence_attached),
+        "evidence_unmatched": len(evidence_unmatched),
+        "evidence_errors": len(evidence_errors),
+        "evidence_attached_rows": evidence_attached,
+        "evidence_unmatched_rows": evidence_unmatched,
+        "evidence_error_rows": evidence_errors,
     }
+
+
+@router.get("/project-pos/evidence/{po_number}")
+async def get_po_evidence(
+    po_number: str,
+    payload: dict = Depends(require_project_user),
+):
+    """Serve attached PO evidence PDF from /app/po_evidence/."""
+    import re as _re
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+
+    safe_name = _re.sub(r"[^A-Za-z0-9_.-]", "_", po_number) + ".pdf"
+    target = Path("/app/po_evidence") / safe_name
+    if not target.exists():
+        raise HTTPException(404, f"ไม่พบ evidence PDF สำหรับ PO {po_number}")
+    return FileResponse(
+        target,
+        media_type="application/pdf",
+        filename=f"{po_number}.pdf",
+    )
 
 
 @router.get("/project-pos/import-hw/logs")
 async def list_hw_import_logs(
-    payload: dict = Depends(require_project_user),
+    payload: dict = Depends(require_finance_or_project_user),
     db: AsyncSession = Depends(get_db),
 ):
     rows = (

@@ -17,6 +17,8 @@
  */
 
 import { Fragment, useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { LayoutDashboard, CalendarDays, ClipboardCheck, History } from 'lucide-react'
+import { ACE_LOGO_DATA_URI } from './src/vendor/aceLogo.js'
 import { apiFetch } from './src/apiFetch.js'
 import { formatDateTime24, formatDateYmd, formatTime24, pad2 as pad } from './src/dateFormat.js'
 
@@ -215,6 +217,12 @@ function Header({ dateStr }) {
   return (
     <div className="ace-clock-header px-5 pb-7 pt-5 relative z-10 shrink-0">
       <div className="flex items-center justify-center gap-2.5 mb-1.5">
+        <img
+          src={ACE_LOGO_DATA_URI}
+          alt="ACE"
+          className="h-9 w-9 rounded-full bg-white object-contain p-1 shadow-sm shrink-0"
+          onError={e => { e.currentTarget.style.display = 'none' }}
+        />
         <span className="ace-clock-title text-2xl font-extrabold text-white">
           ACE Clock System
         </span>
@@ -282,6 +290,29 @@ export default function ClockApp({ authenticatedUser = null, onLogout = null }) 
     if (authenticatedUser) setCurrentUser(authenticatedUser)
   }, [authenticatedUser])
 
+  // Refresh work location from the server on mount / user change. The cached login
+  // in localStorage goes stale when an admin reassigns a user's work location
+  // (e.g. ACE Head Office → AIS Tower2), which would otherwise show the wrong
+  // distance card and validate the clock-in radius against the old location.
+  useEffect(() => {
+    if (!authenticatedUser) return
+    let cancelled = false
+    apiFetch('/api/auth/me')
+      .then(r => (r.ok ? r.json() : null))
+      .then(me => {
+        if (cancelled || !me) return
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          workLat: me.workLat,
+          workLng: me.workLng,
+          workLocationName: me.workLocationName,
+          allowedRadiusM: me.allowedRadiusM,
+        } : prev)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [authenticatedUser])
+
   if (!mobileOk) {
     return <DesktopBlockedScreen />
   }
@@ -312,29 +343,36 @@ export default function ClockApp({ authenticatedUser = null, onLogout = null }) 
 }
 
 /** Tab bar */
+// Bottom navigation — ACE UI Kit style (lucide icons, blue #2447d8 active accent)
 function TabBar({ active, onChange, pendingCount = 0 }) {
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'leave',     label: 'Leave'     },
-    { id: 'approvals', label: 'Approvals', badge: pendingCount },
-    { id: 'history',   label: 'History'   },
+    { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+    { id: 'leave',     label: 'Leave',     Icon: CalendarDays    },
+    { id: 'approvals', label: 'Approvals', Icon: ClipboardCheck, badge: pendingCount },
+    { id: 'history',   label: 'History',   Icon: History         },
   ]
   return (
-    <div className="ace-clock-tabs bg-white flex items-center px-4 sticky top-0 z-20 border-b border-gray-100">
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={`flex-1 text-sm font-medium transition-colors duration-200 cursor-pointer border-none ${active === tab.id ? 'ace-clock-tab-active' : 'ace-clock-tab-idle'}`}
-        >
-          {tab.label}
-          {tab.badge > 0 && (
-            <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold bg-red-500 text-white align-middle">
-              {tab.badge}
+    <div className="ace-clock-bottomnav shrink-0 bg-white flex items-stretch gap-1 px-2 pt-1.5 border-t border-slate-200 z-20">
+      {tabs.map(({ id, label, Icon, badge }) => {
+        const on = active === id
+        return (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            className={`relative flex-1 flex flex-col items-center gap-1 py-1.5 rounded-2xl border-none cursor-pointer bg-transparent transition-colors duration-200 ${on ? 'text-[#2447d8]' : 'text-slate-400'}`}
+          >
+            <span className={`flex items-center justify-center w-12 h-7 rounded-full transition-colors ${on ? 'bg-blue-50' : 'bg-transparent'}`}>
+              <Icon size={20} strokeWidth={on ? 2.4 : 2} />
             </span>
-          )}
-        </button>
-      ))}
+            <span className={`text-[.62rem] leading-none ${on ? 'font-black' : 'font-bold'}`}>{label}</span>
+            {badge > 0 && (
+              <span className="absolute top-0 right-[24%] inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-extrabold bg-red-500 text-white">
+                {badge}
+              </span>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -2641,7 +2679,6 @@ function ClockWorkspace({ currentUser, onLogout }) {
           {view === 'main' && (
             <>
               <Header dateStr={dateStr} />
-              <TabBar active={activeTab} onChange={setActiveTab} pendingCount={pendingApprovals} />
 
               <div className="ace-clock-main-scroll">
 
@@ -2734,9 +2771,14 @@ function ClockWorkspace({ currentUser, onLogout }) {
               Airconnect Engineering (Thailand) Co., Ltd.
             </div>
             <div className="ace-clock-footer-version">
-              ACE Clock System 2.0
+              ACE Clock System 2.1
             </div>
           </div>
+
+          {/* ── Bottom Navigation (main view only) ── */}
+          {view === 'main' && (
+            <TabBar active={activeTab} onChange={setActiveTab} pendingCount={pendingApprovals} />
+          )}
 
         </div>
       </div>

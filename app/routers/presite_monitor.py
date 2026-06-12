@@ -15,7 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services import ftp_service
@@ -373,6 +373,25 @@ def _record_history(
     ))
 
 
+async def _mark_dte_ready(db: AsyncSession, row: "DtePresiteTracking", now: datetime, actor_name: str | None) -> None:
+    """Set dta_clusters.dte_ready_at for the cluster this tracking row belongs to.
+
+    Idempotent (only sets when empty). Best-effort: silently no-ops if the cluster
+    is not in dta_clusters yet. Touches ONLY the handoff columns — milestones stay
+    owned by the Excel ETL.
+    """
+    from app.models.dta_cluster import DtaCluster  # local import avoids load-order issues
+    cluster_name = row.cluster_key or row.rf_cluster_name
+    if not cluster_name:
+        return
+    c = (await db.execute(
+        select(DtaCluster).where(DtaCluster.rf_cluster_name == cluster_name)
+    )).scalar_one_or_none()
+    if c and c.dte_ready_at is None:
+        c.dte_ready_at = now
+        c.dte_ready_by = actor_name
+
+
 @router.post("/tracking/{tracking_id}/advance")
 async def advance(
     tracking_id: int,
@@ -442,6 +461,11 @@ async def advance(
             latest.check_at = now; latest.check_by = actor_code
             latest.check_result = "PASS"; latest.check_notes = body.notes
             latest.status = "DONE"
+        # ── Handoff DTE → DTA ──────────────────────────────────────────────
+        # DTE finished this site (ACE_APPROVED). Flag the matching DTA cluster as
+        # "DTE ready" so the DTA team sees it without anyone telling them by hand.
+        # Writes a dedicated column only — never touches the Excel-owned milestones.
+        await _mark_dte_ready(db, row, now, actor_name)
 
     elif action == "check-fail":
         if stage not in (STAGE_REPORT_DONE, STAGE_CHECKING):
@@ -1912,4 +1936,342 @@ async def cluster_geo_sites(
             }
             for r in rows
         ],
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# DTA Cluster Lifecycle — live data for /project/presite-monitor-dta
+# (imported from the "Cluster Level" sheet via scripts/import_dta_clusters.py)
+# ────────────────────────────────────────────────────────────────────────────
+from app.models.dta_cluster import DtaCluster, DtaClusterRound  # noqa: E402
+
+# dta_clusters column -> frontend milestone id (the 11-step model)
+_DTA_MS = {
+    "site_onair": 1, "cluster_ready": 2, "dt_gen": 3, "dt_approved": 4,
+    "init_test": 5, "pa_open": 6, "tuning_closed": 8, "pac_report": 9,
+    "pac_submit": 10, "pac_approved": 11,
+}
+
+
+def _dta_cluster_to_dict(c: "DtaCluster", rounds: list["DtaClusterRound"]) -> dict:
+    def iso(d):
+        return d.isoformat() if d else None
+
+    dates = {}
+    for col, mid in _DTA_MS.items():
+        v = getattr(c, col)
+        if v:
+            dates[str(mid)] = v.isoformat()
+    # PA Loop (id 7) = latest CR date among rounds
+    cr_dates = [r.cr_date for r in rounds if r.cr_date]
+    if cr_dates:
+        dates["7"] = max(cr_dates).isoformat()
+
+    plan = {}
+    if c.plan_pa_open:      plan["6"] = c.plan_pa_open.isoformat()
+    if c.plan_pa_closed:    plan["8"] = c.plan_pa_closed.isoformat()
+    if c.plan_pac_approved: plan["11"] = c.plan_pac_approved.isoformat()
+
+    return {
+        "code": c.rf_cluster_name,
+        "owner": c.dta_name or "Unassigned",
+        "target_month": c.target_month or "—",
+        "status": c.status or "—",
+        "current_phase": c.current_phase,
+        "age_total": c.age_total,
+        "age_at_phase": c.age_at_phase,
+        "site_count": c.site_count,
+        "readiness": c.readiness,
+        "started": iso(c.cluster_ready or c.dt_gen or c.init_test or c.site_onair),
+        "health": c.health or "amber",
+        "pa_round": c.pa_round,
+        "last_action": c.status or "—",
+        "dates": dates,
+        "plan": plan,
+        "pa_rounds": [
+            {
+                "round": r.round_no,
+                "cr": iso(r.cr_date),
+                "tuning_done": iso(r.tuning_done),
+                "compare_done": iso(r.compare_done),
+                "discuss_date": iso(r.discuss_date),
+                "pa_closed": r.pa_closed,
+                "pa_added": r.pa_added,
+                "test_plan_start": iso(r.test_plan_start),
+                "test_plan_done": iso(r.test_plan_done),
+                "test_actual_start": iso(r.test_actual_start),
+                "test_actual_done": iso(r.test_actual_done),
+                "test_engineer": r.test_engineer,
+            }
+            for r in rounds
+        ],
+        "lat": c.lat,
+        "lng": c.lng,
+        "geo": 1 if (c.lat is not None and c.lng is not None) else 0,
+        "po_number": c.po_number,
+        "owner_source": c.owner_source,
+        "dte_ready_at": c.dte_ready_at.isoformat() if c.dte_ready_at else None,
+        "dte_ready_by": c.dte_ready_by,
+    }
+
+
+@router.get("/dta/clusters")
+async def dta_clusters(
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_user),
+):
+    """All DTA clusters with lifecycle + PA rounds (replaces the static clusterMockData.js)."""
+    cl_rows = (await db.execute(select(DtaCluster).order_by(DtaCluster.rf_cluster_name))).scalars().all()
+    rd_rows = (await db.execute(select(DtaClusterRound).order_by(
+        DtaClusterRound.rf_cluster_name, DtaClusterRound.round_no))).scalars().all()
+    by_cluster: dict[str, list] = {}
+    for r in rd_rows:
+        by_cluster.setdefault(r.rf_cluster_name, []).append(r)
+
+    clusters = [_dta_cluster_to_dict(c, by_cluster.get(c.rf_cluster_name, [])) for c in cl_rows]
+    as_of = max((c.as_of_date for c in cl_rows if c.as_of_date), default=None)
+    return {"count": len(clusters), "as_of": as_of.isoformat() if as_of else None, "clusters": clusters}
+
+
+@router.get("/dta/clusters/{cluster_name}")
+async def dta_cluster_detail(
+    cluster_name: str,
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_user),
+):
+    """Single cluster detail + rounds."""
+    c = (await db.execute(select(DtaCluster).where(DtaCluster.rf_cluster_name == cluster_name))).scalar_one_or_none()
+    if not c:
+        raise HTTPException(404, "Cluster not found")
+    rounds = (await db.execute(select(DtaClusterRound).where(
+        DtaClusterRound.rf_cluster_name == cluster_name).order_by(DtaClusterRound.round_no))).scalars().all()
+    return _dta_cluster_to_dict(c, rounds)
+
+
+# Roles allowed to (re)assign cluster owners — PM/Admin/Project
+ROLE_ASSIGN = {"PROJECT_ADMIN", "PM", "DIRECTOR", "SUPER_ADMIN", "SYSTEM_ADMIN"}
+
+
+class DtaAssignItem(BaseModel):
+    cluster: str
+    dta_name: str | None = None     # None / "" / "Unassigned" → clear owner
+
+
+class DtaAssignPayload(BaseModel):
+    assignments: list[DtaAssignItem]
+
+
+@router.post("/dta/assign")
+async def dta_assign(
+    body: DtaAssignPayload,
+    payload: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign DTA owners to clusters. Sets owner_source='MANUAL' so the ETL won't overwrite.
+
+    Pass dta_name=null/""/"Unassigned" to clear an owner (reverts to EXCEL source so the
+    sheet value flows back on the next import).
+    """
+    if payload.get("role") not in ROLE_ASSIGN:
+        raise HTTPException(403, "Only PM/Project/Admin may assign cluster owners")
+    actor = payload.get("name") or payload.get("employee_code") or payload.get("sub")
+    now = datetime.now(timezone.utc)
+
+    updated, missing = [], []
+    for item in body.assignments:
+        c = (await db.execute(
+            select(DtaCluster).where(DtaCluster.rf_cluster_name == item.cluster)
+        )).scalar_one_or_none()
+        if not c:
+            missing.append(item.cluster)
+            continue
+        name = (item.dta_name or "").strip()
+        if not name or name.lower() == "unassigned":
+            # clear → revert to EXCEL provenance (sheet wins again next import)
+            c.dta_name = None
+            c.owner_source = "EXCEL"
+            c.assigned_at = None
+            c.assigned_by = None
+        else:
+            c.dta_name = name
+            c.owner_source = "MANUAL"
+            c.assigned_at = now
+            c.assigned_by = actor
+        updated.append(item.cluster)
+
+    await db.commit()
+    return {"ok": True, "updated": len(updated), "missing": missing, "by": actor}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# DTA Billing — what Accounting needs to collect (1 hw_id = 1 billing line)
+# ────────────────────────────────────────────────────────────────────────────
+# Bridge: project_pos.cluster_site (RYG0506_Flash...) → site prefix → project_sites.site_code
+#         → rf_cluster_name → dta_clusters. hw_id is the per-line billing reference.
+#
+# AC1/AC2: Huawei pays in 1 or 2 installments. The split is in hw_data->>'Payment Terms', e.g.
+#   "AC1 (100%, Complete 100%)"               → single installment
+#   "AC1 (70%, Complete 70%) / AC2 (30%, ..)" → two installments
+import re as _re_billing
+
+_AC1_RE = _re_billing.compile(r"AC1\s*\(([\d.]+)\s*%")
+_AC2_RE = _re_billing.compile(r"AC2\s*\(([\d.]+)\s*%")
+
+
+def _parse_ac_split(terms_text: str | None) -> tuple[float, float]:
+    """Return (ac1_pct, ac2_pct) from a Huawei payment-terms string."""
+    if not terms_text:
+        return 100.0, 0.0
+    m1 = _AC1_RE.search(terms_text)
+    m2 = _AC2_RE.search(terms_text)
+    ac1 = float(m1.group(1)) if m1 else 100.0
+    ac2 = float(m2.group(1)) if m2 else 0.0
+    return ac1, ac2
+
+
+# PAC: per-line joined to its cluster (billable when the cluster is PAC Approved).
+_PAC_BILLING_SQL = """
+SELECT
+  'PAC'                            AS kind,
+  s.rf_cluster_name                AS grp_key,
+  d.dta_name                       AS owner,
+  d.current_phase                  AS phase,
+  d.pac_approved                   AS done_date,
+  (d.current_phase >= 11)          AS ready,
+  p.hw_id                          AS billing_ref,
+  split_part(p.cluster_site,'_',1) AS site,
+  p.du_id, p.cluster_site, p.item_dis, p.po_number, p.po_line,
+  p.line_amount                    AS amount,
+  p.hw_data->>'Payment Terms'      AS terms_text,
+  p.ac1_billed_at, p.ac1_invoice_no,
+  p.ac2_billed_at, p.ac2_invoice_no,
+  p.hw_po_status
+FROM project_pos p
+JOIN project_sites s ON s.site_code = split_part(p.cluster_site, '_', 1)
+JOIN dta_clusters d  ON d.rf_cluster_name = s.rf_cluster_name
+WHERE p.work_type = 'PAC'
+"""
+
+# SSV: each PO line is a standalone job. Billable when the per-site tracking reaches
+# ACE_APPROVED. Bridge to dte_presite_tracking via du_id for the stage signal.
+_SSV_BILLING_SQL = """
+SELECT
+  'SSV'                            AS kind,
+  COALESCE(s.rf_cluster_name, split_part(p.cluster_site,'_',1)) AS grp_key,
+  COALESCE(t.dta_name, t.assigned_dte_name) AS owner,
+  NULL::int                        AS phase,
+  t.ace_approve_at                 AS done_date,
+  (t.current_stage = 'ACE_APPROVED') AS ready,
+  p.hw_id                          AS billing_ref,
+  split_part(p.cluster_site,'_',1) AS site,
+  p.du_id, p.cluster_site, p.item_dis, p.po_number, p.po_line,
+  p.line_amount                    AS amount,
+  p.hw_data->>'Payment Terms'      AS terms_text,
+  p.ac1_billed_at, p.ac1_invoice_no,
+  p.ac2_billed_at, p.ac2_invoice_no,
+  p.hw_po_status
+FROM project_pos p
+LEFT JOIN project_sites s        ON s.site_code = split_part(p.cluster_site, '_', 1)
+LEFT JOIN dte_presite_tracking t ON t.du_id = p.du_id
+WHERE p.work_type = 'SSV'
+"""
+
+
+def _billing_line(r) -> dict:
+    amt = float(r["amount"]) if r["amount"] is not None else 0.0
+    ac1_pct, ac2_pct = _parse_ac_split(r["terms_text"])
+    ac1_amt = round(amt * ac1_pct / 100.0, 2)
+    ac2_amt = round(amt * ac2_pct / 100.0, 2)
+    return {
+        "billing_ref": r["billing_ref"],          # hw_id
+        "site": r["site"],
+        "du_id": r["du_id"],
+        "cluster_site": r["cluster_site"],        # full DU name e.g. BKA1123_Conso_Retain_BMA R2
+        "item_dis": r["item_dis"],
+        "po_number": r["po_number"],
+        "po_line": r["po_line"],
+        "amount": amt,
+        "hw_status": r["hw_po_status"],
+        # AC1 installment
+        "ac1_pct": ac1_pct,
+        "ac1_amount": ac1_amt,
+        "ac1_billed": r["ac1_billed_at"] is not None,
+        "ac1_billed_at": r["ac1_billed_at"].isoformat() if r["ac1_billed_at"] else None,
+        "ac1_invoice_no": r["ac1_invoice_no"],
+        # AC2 installment (only when split)
+        "ac2_pct": ac2_pct,
+        "ac2_amount": ac2_amt,
+        "ac2_billed": r["ac2_billed_at"] is not None,
+        "ac2_billed_at": r["ac2_billed_at"].isoformat() if r["ac2_billed_at"] else None,
+        "ac2_invoice_no": r["ac2_invoice_no"],
+        "has_ac2": ac2_pct > 0,
+    }
+
+
+@router.get("/dta/billing")
+async def dta_billing(
+    work_type: str = Query("PAC", description="PAC | SSV | ALL"),
+    ready_only: bool = Query(False, description="Only billable groups (PAC approved / SSV ACE_APPROVED)"),
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_user),
+):
+    """Billing sheet for Accounting — one row per hw_id, split into AC1/AC2 installments.
+
+    PAC groups by cluster (billable at PAC Approved); SSV groups per site (billable at
+    ACE_APPROVED). Each line shows AC1 + AC2 amounts derived from the PO payment terms.
+    """
+    wt = (work_type or "PAC").upper()
+    rows = []
+    if wt in ("PAC", "ALL"):
+        rows += [dict(r, _kind="PAC") for r in (await db.execute(text(_PAC_BILLING_SQL))).mappings().all()]
+    if wt in ("SSV", "ALL"):
+        rows += [dict(r, _kind="SSV") for r in (await db.execute(text(_SSV_BILLING_SQL))).mappings().all()]
+
+    groups: dict[str, dict] = {}
+    for r in rows:
+        ready = bool(r["ready"])
+        if ready_only and not ready:
+            continue
+        gkey = f"{r['_kind']}::{r['grp_key']}"
+        g = groups.setdefault(gkey, {
+            "kind": r["_kind"],
+            "key": r["grp_key"],
+            "owner": r["owner"],
+            "phase": r["phase"],
+            "done_date": r["done_date"].isoformat() if r["done_date"] else None,
+            "ready": ready,
+            "po_number": r["po_number"],
+            "lines": [],
+            "total_amount": 0.0,
+            "ac1_total": 0.0,
+            "ac2_total": 0.0,
+            "ac1_billed_count": 0,
+            "ac2_billed_count": 0,
+        })
+        ln = _billing_line(r)
+        g["lines"].append(ln)
+        g["total_amount"] = round(g["total_amount"] + ln["amount"], 2)
+        g["ac1_total"] = round(g["ac1_total"] + ln["ac1_amount"], 2)
+        g["ac2_total"] = round(g["ac2_total"] + ln["ac2_amount"], 2)
+        if ln["ac1_billed"]:
+            g["ac1_billed_count"] += 1
+        if ln["ac2_billed"]:
+            g["ac2_billed_count"] += 1
+
+    out = sorted(groups.values(), key=lambda x: x["total_amount"], reverse=True)
+    grand_total = round(sum(g["total_amount"] for g in out), 2)
+    ac1_total = round(sum(g["ac1_total"] for g in out), 2)
+    ac2_total = round(sum(g["ac2_total"] for g in out), 2)
+    ready_total = round(sum(g["total_amount"] for g in out if g["ready"]), 2)
+    return {
+        "work_type": wt,
+        "groups": out,
+        "summary": {
+            "group_count": len(out),
+            "line_count": sum(len(g["lines"]) for g in out),   # = distinct hw_id
+            "grand_total": grand_total,
+            "ac1_total": ac1_total,
+            "ac2_total": ac2_total,
+            "ready_total": ready_total,
+        },
     }

@@ -1084,7 +1084,7 @@ async def cancel_leave(
         raise HTTPException(404, "Leave request not found.")
     if leave.employee_code != employee_code:
         raise HTTPException(403, "You can only cancel your own requests.")
-    if leave.status not in ("PENDING_PM", "PENDING_DC", "PENDING_HR"):
+    if leave.status not in ("PENDING_PM", "PENDING_SPM", "PENDING_DC", "PENDING_HR"):
         raise HTTPException(400, f"Cannot cancel: status is {leave.status}.")
     leave.status = "CANCELLED"
     await db.commit()

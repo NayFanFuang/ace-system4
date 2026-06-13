@@ -327,7 +327,11 @@
       "Bash(MSYS_NO_PATHCONV=1 docker exec ace-system-backend cat /app/app/services/leave_tokens.py)",
       "Bash(python -c \"import ast; [ast.parse\\(open\\(f\\).read\\(\\)\\) for f in ['app/routers/leave.py','app/services/leave_emails.py','app/services/leave_tokens.py']]; print\\('all 3 OK'\\)\")",
       "Bash(grep -n \"LeaveFlowDiagram leaveType={lv\\\\|LeaveFlowDiagram leaveType={leaveType}\\\\|status === 'PENDING_PM'\\) return 'pm-approve'\\\\|\\\\['PENDING', 'PENDING_PM', 'PENDING_DC', 'PENDING_HR'\\\\]\" frontend/ClockApp.jsx)",
-      "Bash(curl -s \"http://127.0.0.1:5173/HREmployeePage.jsx\" -o /tmp/hrnav.txt -w \"%{http_code}\")"
+      "Bash(curl -s \"http://127.0.0.1:5173/HREmployeePage.jsx\" -o /tmp/hrnav.txt -w \"%{http_code}\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec -i ace-system-backend sh -c 'cat > /app/leave_e2e.py')",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec -e EMAIL_DRY_RUN=1 ace-system-backend python /app/leave_e2e.py)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec ace-system-backend rm -f /app/leave_e2e.py /tmp/_chk)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:5173/)"
     ]
   }
 }

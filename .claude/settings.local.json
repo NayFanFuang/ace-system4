@@ -316,7 +316,18 @@
       "Bash(python -c \"from deploy_env import load_deploy_creds; c=load_deploy_creds\\(\\); print\\('host:',c['host']\\); print\\('port:',c['port']\\); print\\('user:',c['user']\\); print\\('password loaded:', 'YES' if c['password'] else 'NO'\\)\")",
       "Bash(python -m py_compile deploy.py deploy_frontend.py deploy_migration.py deploy_env.py)",
       "Bash(python deploy_migration.py migrations/20260608_enable_btree_gist.sql)",
-      "Bash(python _verify_prod.py)"
+      "Bash(python _verify_prod.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "Bash(cd /c/GoogleAppScript/0_NewServer/ACE_System4)",
+      "Bash(MSYS_NO_PATHCONV=1 docker cp ace-system-backend:/app/app/routers/leave.py app/routers/leave.py)",
+      "Bash(MSYS_NO_PATHCONV=1 docker cp ace-system-backend:/app/app/services/leave_emails.py app/services/leave_emails.py)",
+      "Bash(MSYS_NO_PATHCONV=1 docker cp ace-system-backend:/app/app/services/leave_tokens.py app/services/leave_tokens.py)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec ace-system-backend cat /app/app/routers/leave.py)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec ace-system-backend cat /app/app/services/leave_emails.py)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec ace-system-backend cat /app/app/services/leave_tokens.py)",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(f\\).read\\(\\)\\) for f in ['app/routers/leave.py','app/services/leave_emails.py','app/services/leave_tokens.py']]; print\\('all 3 OK'\\)\")",
+      "Bash(grep -n \"LeaveFlowDiagram leaveType={lv\\\\|LeaveFlowDiagram leaveType={leaveType}\\\\|status === 'PENDING_PM'\\) return 'pm-approve'\\\\|\\\\['PENDING', 'PENDING_PM', 'PENDING_DC', 'PENDING_HR'\\\\]\" frontend/ClockApp.jsx)",
+      "Bash(curl -s \"http://127.0.0.1:5173/HREmployeePage.jsx\" -o /tmp/hrnav.txt -w \"%{http_code}\")"
     ]
   }
 }

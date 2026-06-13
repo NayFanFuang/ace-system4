@@ -3,7 +3,7 @@ import { apiFetch } from './src/apiFetch.js'
 import {
   Activity, AlertTriangle, BarChart3, CalendarRange, CalendarDays, CheckCircle2, ChevronRight, Clock,
   Command, Crown, GitBranch, Gauge as GaugeIcon, Layers, LayoutGrid, LogOut, Map as MapIcon, MapPin,
-  RefreshCw, Search, Sparkles, Target, TrendingUp, TrendingDown, Trophy, Users, Wallet,
+  RefreshCw, Search, Sparkles, Target, TrendingUp, TrendingDown, Trophy, Users, UserPlus, Wallet, Check,
 } from 'lucide-react'
 import {
   Card, StatCard, Badge, Button, Tabs, Table, Gauge, MapView,
@@ -42,22 +42,11 @@ const MILESTONES = [
 const DONE_PHASE = 11
 const PA_LOOP_MAX = 4
 
-/* ---------- Cluster data — FULL real set (289 clusters) ---------- */
-// DTA (owner) names — override the original TRUE owner with the DTA team
-const DTA_NAMES = [
-  'TH_Yodsawee', 'TH_Natdanai', 'TH_Khanchit',
-  'TH_Thachatham', 'TH_Choowong', 'TH_Thatsanai',
-]
-
-// deterministic hash so each cluster always maps to the same DTA
-function dtaForCode(code) {
-  let h = 0
-  for (let i = 0; i < code.length; i++) h = (h * 31 + code.charCodeAt(i)) >>> 0
-  return DTA_NAMES[h % DTA_NAMES.length]
-}
-
-// all 289 clusters from clusterMockData.gen.py, owner remapped to the DTA team
-const MOCK_CLUSTERS = CLUSTERS.map(c => ({ ...c, owner: dtaForCode(c.code) }))
+/* ---------- Cluster data ---------- */
+// Live from /api/presite/dta/clusters (DB, imported from "Cluster Level" sheet).
+// Falls back to the bundled static snapshot if the API is unreachable.
+// `let` so the fetch can swap in live data; views read it at render time.
+let MOCK_CLUSTERS = CLUSTERS
 
 /* ---------- Discussion sheet KPI (ISDP Milestone on PAC Approval) ---------- */
 const MOCK_MILESTONE_KPI = [
@@ -108,7 +97,7 @@ function milestoneDates(cluster) {
 }
 
 /* ---------- Schedule variance: Plan vs Actual (cols EV/EW/EX from sheet) ---------- */
-const AS_OF_DATE = new Date((AS_OF || '2026-05-30') + 'T00:00:00')
+let AS_OF_DATE = new Date((AS_OF || '2026-05-30') + 'T00:00:00')
 const dayDiff = (a, b) => Math.round((a - b) / 86400000)
 const toDate = s => new Date(s + 'T00:00:00')
 const VAR_MILESTONES = [11, 8, 6]                  // PAC Approved → PA Closed/Tuning → PA Open
@@ -157,6 +146,7 @@ const NAV_ITEMS = [
   { id: 'SCORECARD', label: 'Monthly Scorecard',   desc: 'Owner × Month',         icon: Target },
   { id: 'FUNNEL',    label: 'Pipeline Funnel',     desc: 'Where clusters stand',  icon: BarChart3 },
   { id: 'BOARD',     label: 'Owner Board',         desc: 'Kanban by owner',       icon: LayoutGrid },
+  { id: 'ASSIGN',    label: 'Owner (Assign)',      desc: 'มอบหมาย DTA ให้ cluster', icon: UserPlus },
   { id: 'GANTT',     label: 'Gantt Timeline',      desc: 'Plan vs Actual bars',   icon: CalendarRange },
   { id: 'MAP',       label: 'Map View',            desc: 'Geo by health',         icon: MapIcon },
 ]
@@ -164,6 +154,22 @@ const NAV_ITEMS = [
 export default function PreSiteMonitorDtaPage({ authenticatedUser, onLogout }) {
   const [tab, setTab] = useState('EXEC')
   const [drawerCluster, setDrawerCluster] = useState(null)
+  const [dataReady, setDataReady] = useState(false)   // re-render once live data lands
+
+  // Pull live cluster data from the API; keep the static snapshot as fallback.
+  useEffect(() => {
+    let alive = true
+    apiFetch('/api/presite/dta/clusters')
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(d => {
+        if (!alive || !d?.clusters?.length) return
+        MOCK_CLUSTERS = d.clusters
+        if (d.as_of) AS_OF_DATE = new Date(d.as_of + 'T00:00:00')
+        setDataReady(x => !x)
+      })
+      .catch(() => {})   // offline → keep bundled snapshot
+    return () => { alive = false }
+  }, [])
 
   const current = NAV_ITEMS.find(n => n.id === tab)
   const role = authenticatedUser?.role || 'EMPLOYEE'
@@ -189,14 +195,18 @@ export default function PreSiteMonitorDtaPage({ authenticatedUser, onLogout }) {
             <h1 className="mt-1 text-2xl font-black text-slate-950">{current?.label}</h1>
           </div>
 
-          {tab === 'EXEC'      && <ExecutiveView onOpen={setDrawerCluster} />}
-          {tab === 'TIMELINE'  && <TimelineView onOpen={setDrawerCluster} />}
-          {tab === 'DASHBOARD' && <DashboardView />}
-          {tab === 'SCORECARD' && <ScorecardView />}
-          {tab === 'FUNNEL'    && <FunnelView />}
-          {tab === 'BOARD'     && <OwnerBoardView onOpen={setDrawerCluster} />}
-          {tab === 'GANTT'     && <GanttView onOpen={setDrawerCluster} />}
-          {tab === 'MAP'       && <MapViewPanel onOpen={setDrawerCluster} />}
+          {/* key on dataReady so views recompute their memoized data when live data lands */}
+          <div key={String(dataReady)}>
+            {tab === 'EXEC'      && <ExecutiveView onOpen={setDrawerCluster} />}
+            {tab === 'TIMELINE'  && <TimelineView onOpen={setDrawerCluster} />}
+            {tab === 'DASHBOARD' && <DashboardView />}
+            {tab === 'SCORECARD' && <ScorecardView />}
+            {tab === 'FUNNEL'    && <FunnelView />}
+            {tab === 'BOARD'     && <OwnerBoardView onOpen={setDrawerCluster} />}
+            {tab === 'ASSIGN'    && <AssignView />}
+            {tab === 'GANTT'     && <GanttView onOpen={setDrawerCluster} />}
+            {tab === 'MAP'       && <MapViewPanel onOpen={setDrawerCluster} />}
+          </div>
         </main>
       </div>
 
@@ -347,6 +357,7 @@ function TimelineView({ onOpen }) {
     if (filterStatus === 'INPROG' && (c.current_phase >= DONE_PHASE || c.current_phase < 5)) return false
     if (filterStatus === 'AT_RISK' && c.health === 'green') return false
     if (filterStatus === 'EARLY' && c.current_phase >= 5) return false
+    if (filterStatus === 'DTE_READY' && !c.dte_ready_at) return false
     if (search && !c.code.toLowerCase().includes(search.toLowerCase())) return false
     return true
   }), [filterOwner, filterMonth, filterStatus, search])
@@ -393,6 +404,7 @@ function TimelineView({ onOpen }) {
               <option value="INPROG">In Progress</option>
               <option value="AT_RISK">At Risk</option>
               <option value="EARLY">Early Stage</option>
+              <option value="DTE_READY">DTE Ready (handoff)</option>
             </Select>
           </Field>
           <div className="xl:ml-auto text-xs font-black text-slate-500">
@@ -423,6 +435,7 @@ function ClusterCard({ cluster: c, onOpen }) {
             <div className="flex flex-wrap items-center gap-2">
               <div className="text-base font-black text-slate-950">{c.code}</div>
               <Badge tone={HEALTH_TONE[c.health]} dot>{HEALTH_LABEL[c.health]}</Badge>
+              {c.dte_ready_at && <Badge tone="green" dot>DTE Ready</Badge>}
               {c.pa_round > 0 && <Badge tone="purple">PA R{c.pa_round}/{PA_LOOP_MAX}</Badge>}
               <VarianceBadge v={scheduleVariance(c)} />
             </div>
@@ -541,12 +554,36 @@ function PaRounds({ rounds }) {
   )
 }
 
+// Cross-system links: open this cluster in Project PO / Pre-Site (DTE) / Billing.
+function ClusterLinks({ cluster }) {
+  const enc = encodeURIComponent(cluster.code)
+  // PO uses the EAS prefix (PO list searches site names that contain it); presite matches rf_cluster_name exactly
+  const eas = cluster.code.split('-')[0]
+  const links = [
+    { label: 'Project PO', href: `/projects/manage`, hint: `ค้นหา "${eas}" ในหน้า PO` },
+    { label: 'Pre-Site (DTE)', href: `/project/presite-monitor?cluster=${enc}`, hint: 'เปิด + auto-search cluster' },
+    { label: 'Billing', href: `/finance/dta-billing`, hint: 'หน้าเก็บเงิน PAC/SSV' },
+  ]
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[11px] font-black uppercase tracking-wide text-slate-400">เปิดใน:</span>
+      {links.map(l => (
+        <a key={l.label} href={l.href} title={l.hint}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">
+          <Layers size={13} /> {l.label}
+        </a>
+      ))}
+    </div>
+  )
+}
+
 function ClusterDetail({ cluster }) {
   const dates = milestoneDates(cluster)
   const [loopOpen, setLoopOpen] = useState(true)
   const rounds = cluster.pa_rounds || []
   return (
     <div className="grid gap-5">
+      <ClusterLinks cluster={cluster} />
       <section>
         <h3 className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">Lifecycle Timeline</h3>
         <Card className="bg-slate-50 p-5">
@@ -621,6 +658,20 @@ function ClusterDetail({ cluster }) {
           })}
         </div>
       </section>
+
+      {cluster.dte_ready_at && (
+        <section>
+          <Card className="border-emerald-200 bg-emerald-50/60 p-4">
+            <div className="flex items-center gap-2 text-sm font-black text-emerald-800">
+              <Badge tone="green" dot>DTE Ready</Badge> DTE ส่งงานต่อแล้ว — พร้อมทำ tuning/PA
+            </div>
+            <div className="mt-1 text-xs font-bold text-emerald-700/80">
+              DTE จบ (ACE Approved) เมื่อ {fmtDate(toDate(cluster.dte_ready_at.slice(0, 10)))}
+              {cluster.dte_ready_by && ` · โดย ${cluster.dte_ready_by}`}
+            </div>
+          </Card>
+        </section>
+      )}
 
       <section>
         <h3 className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Current Status</h3>
@@ -1084,13 +1135,16 @@ function MapViewPanel({ onOpen }) {
     return () => { alive = false }
   }, [])
 
-  // join cluster data with real coords (code === rf_cluster_name)
+  // join cluster data with real coords — prefer the cluster's own lat/lng (from
+  // /api/presite/dta/clusters), then the cluster-geo endpoint, then a mock point.
   const rows = useMemo(() => {
     const g = geo || {}
     return MOCK_CLUSTERS.map(c => {
-      const real = g[c.code]
+      const own = (c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null
+      const ext = g[c.code]
+      const real = own || ext
       const pos = real || mockLatLng(c.code)
-      return { c, lat: pos.lat, lng: pos.lng, real: !!real, sites: real?.sites ?? c.site_count }
+      return { c, lat: pos.lat, lng: pos.lng, real: !!real, sites: ext?.sites ?? c.site_count }
     })
   }, [geo])
 
@@ -1421,5 +1475,175 @@ function ExecForecastCard() {
         📈 At current run-rate (~{Math.round(rate)}/day), target {target} reached in ~<b>{etaDays ?? '—'} days</b>
       </div>
     </Card>
+  )
+}
+
+/* ============================================================
+   OWNER (ASSIGN) — มอบหมาย DTA ให้แต่ละ cluster (PoC, client-side)
+   ยังไม่เขียน DB — เก็บใน state ก่อน เพื่อดู flow การมอบหมาย
+   ============================================================ */
+// Official DTA team — these are the people clusters can be assigned to.
+const DTA_TEAM = [
+  'TH_Choowong',
+  'TH_Khanchit',
+  'TH_Natdanai',
+  'TH_Thachatham',
+  'TH_Thatsanai',
+  'TH_Yodsawee',
+]
+
+function AssignView() {
+  const dtaList = DTA_TEAM
+
+  // local override map: { [clusterCode]: dtaName } — pending edits before Apply
+  const [assign, setAssign] = useState({})
+  const [filterDta, setFilterDta] = useState('ALL')
+  const [search, setSearch] = useState('')
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const ownerOf = c => assign[c.code] ?? c.owner ?? 'Unassigned'
+
+  const rows = useMemo(() => MOCK_CLUSTERS.filter(c => {
+    const owner = ownerOf(c)
+    if (filterDta === 'UNASSIGNED' && owner !== 'Unassigned') return false
+    if (filterDta !== 'ALL' && filterDta !== 'UNASSIGNED' && owner !== filterDta) return false
+    if (search && !c.code.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  }), [assign, filterDta, search])
+
+  // workload per DTA (after pending assignment)
+  const workload = useMemo(() => {
+    const m = {}
+    MOCK_CLUSTERS.forEach(c => { const o = ownerOf(c); m[o] = (m[o] || 0) + 1 })
+    return m
+  }, [assign])
+
+  const pendingCount = Object.keys(assign).filter(k => assign[k] !== (MOCK_CLUSTERS.find(c => c.code === k)?.owner)).length
+
+  function setOwner(code, dta) {
+    setAssign(a => ({ ...a, [code]: dta }))
+  }
+  async function applyAll() {
+    // only changed clusters
+    const items = Object.keys(assign)
+      .filter(code => assign[code] !== (MOCK_CLUSTERS.find(c => c.code === code)?.owner))
+      .map(code => ({ cluster: code, dta_name: assign[code] }))
+    if (!items.length) return
+    setSaving(true); setError('')
+    try {
+      const r = await apiFetch('/api/presite/dta/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignments: items }),
+      })
+      if (!r.ok) throw new Error(r.status === 403 ? 'No permission to assign' : `Save failed (${r.status})`)
+      const data = await r.json()
+      // reflect saved owner into the in-memory data so the table shows the new owner
+      items.forEach(it => {
+        const c = MOCK_CLUSTERS.find(x => x.code === it.cluster)
+        if (c) c.owner = (it.dta_name && it.dta_name.toLowerCase() !== 'unassigned') ? it.dta_name : 'Unassigned'
+      })
+      setAssign({})
+      setSavedFlash(`Saved ${data.updated} cluster${data.updated === 1 ? '' : 's'}`)
+      setTimeout(() => setSavedFlash(false), 3000)
+    } catch (e) {
+      setError(e.message || 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+  function resetAll() { setAssign({}); setError('') }
+
+  return (
+    <div className="grid gap-4">
+      {/* workload summary per DTA */}
+      <Card className="p-5">
+        <div className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">DTA Workload (after pending assignment)</div>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(workload).sort((a, b) => b[1] - a[1]).map(([dta, n]) => (
+            <button key={dta} type="button" onClick={() => setFilterDta(dta)}
+              className={'flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition ' +
+                (filterDta === dta ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')}>
+              <span className="grid h-6 w-6 place-items-center rounded-full text-[10px] font-black text-white" style={{ background: dta === 'Unassigned' ? '#94a3b8' : BRAND }}>
+                {dta === 'Unassigned' ? '—' : dta.replace('TH_', '').replace('KH_', '').replace('PH_', '').slice(0, 2).toUpperCase()}
+              </span>
+              {dta}
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">{n}</span>
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      {/* toolbar */}
+      <Card className="flex flex-wrap items-center gap-3 p-4">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search EAS code..."
+            className="rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400" />
+        </div>
+        <select value={filterDta} onChange={e => setFilterDta(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
+          <option value="ALL">All DTA</option>
+          <option value="UNASSIGNED">Unassigned only</option>
+          {dtaList.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <div className="ml-auto flex items-center gap-2">
+          {pendingCount > 0 && <Badge tone="amber">{pendingCount} pending</Badge>}
+          {savedFlash && <Badge tone="green">{typeof savedFlash === 'string' ? savedFlash : 'Saved'}</Badge>}
+          {error && <Badge tone="red">{error}</Badge>}
+          <Button variant="ghost" onClick={resetAll} disabled={!pendingCount || saving}>Reset</Button>
+          <Button variant="primary" icon={Check} onClick={applyAll} disabled={!pendingCount || saving} loading={saving}>Apply assignment</Button>
+        </div>
+      </Card>
+
+      {/* assignment table */}
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-2 text-left">Cluster</th>
+                <th className="px-4 py-2 text-left">Phase</th>
+                <th className="px-4 py-2 text-left">Sites</th>
+                <th className="px-4 py-2 text-left">Current Owner</th>
+                <th className="px-4 py-2 text-left">Assign to DTA</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map(c => {
+                const cur = c.owner || 'Unassigned'
+                const next = ownerOf(c)
+                const changed = next !== cur
+                return (
+                  <tr key={c.code} className={changed ? 'bg-amber-50/40' : 'hover:bg-slate-50'}>
+                    <td className="px-4 py-2 font-black text-slate-900">{c.code}</td>
+                    <td className="px-4 py-2"><Badge tone={c.current_phase >= DONE_PHASE ? 'green' : 'slate'}>{MILESTONES[c.current_phase - 1].short}</Badge></td>
+                    <td className="px-4 py-2 font-mono text-slate-500">{c.site_count}</td>
+                    <td className="px-4 py-2 font-bold text-slate-600">{cur}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <select value={next} onChange={e => setOwner(c.code, e.target.value)}
+                          className={'rounded-lg border px-2 py-1 text-xs font-bold ' + (changed ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-slate-200 text-slate-700')}>
+                          <option value="Unassigned">— Unassigned —</option>
+                          {dtaList.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        {changed && <ChevronRight size={13} className="text-amber-500" />}
+                        {changed && <span className="text-[10px] font-bold text-amber-600">{cur} → {next}</span>}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {!rows.length && <tr><td colSpan={5} className="py-8 text-center text-xs font-bold text-slate-400">No clusters match</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card className="border-dashed bg-blue-50/40 p-4 text-xs font-bold text-blue-900">
+        💡 เลือก DTA ในแต่ละแถว แล้วกด "Apply assignment" เพื่อบันทึกลง DB จริง (owner_source=MANUAL). การมอบหมายเองจะไม่ถูก ETL ทับเมื่อ import sheet ใหม่ — เลือก "Unassigned" เพื่อคืนค่าให้ใช้ owner จาก sheet
+      </Card>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -183,6 +183,15 @@ async def _pd_emails(db: AsyncSession, employee_code: str, first_approver_code: 
     return await _manager_emails(db, first_approver_code, "DIRECTOR")
 
 
+async def _spm_emails(db: AsyncSession, pm_code: str) -> list[str]:
+    """Senior PM = the approving PM's own manager, with PROJECT_ADMIN fallback.
+
+    Used only by the FULL approval chain (PM → SPM → DC). Mirrors the
+    direct-manager-with-role-fallback pattern of _pd_emails / _manager_emails.
+    """
+    return await _manager_emails(db, pm_code, "PROJECT_ADMIN")
+
+
 async def _leave_stakeholder_emails(db: AsyncSession, leave: LeaveRequest, actor_code: str | None = None) -> list[str]:
     """Resolve every email address that should at minimum receive a CC for this leave.
 
@@ -313,8 +322,8 @@ async def _leave_stats(db: AsyncSession, leave: LeaveRequest) -> dict:
         remaining_text = _days_text(entitlement - remaining_basis)
         entitlement_text = _days_text(entitlement)
 
-    # ── 3-month rolling history (same category) ────────────────────────────
-    months = _month_window_back(leave.start_date, 3)
+    # ── 6-month rolling history (same category) ────────────────────────────
+    months = _month_window_back(leave.start_date, 6)
     window_start = date(months[0][0], months[0][1], 1)
     history_rows = (await db.execute(
         select(LeaveRequest).where(
@@ -337,18 +346,36 @@ async def _leave_stats(db: AsyncSession, leave: LeaveRequest) -> dict:
         elif row.status.startswith("PENDING"):
             monthly_pending[key] += days
 
-    last_3_months = [
+    last_6_months = [
         {
             "label":     _month_label(y, m),
             "year":      y,
             "month":     m,
             "approved":  monthly_approved[(y, m)],
             "pending":   monthly_pending[(y, m)],
+            "total":     monthly_approved[(y, m)] + monthly_pending[(y, m)],
         }
         for (y, m) in months
     ]
-    last_3_months_total_approved = sum(item["approved"] for item in last_3_months)
-    last_3_months_total_pending  = sum(item["pending"]  for item in last_3_months)
+    last_6_months_total_approved = sum(item["approved"] for item in last_6_months)
+    last_6_months_total_pending  = sum(item["pending"]  for item in last_6_months)
+
+    # ── Most recent prior leave (any category, actually taken) ──────────────
+    last_leave_row = (await db.execute(
+        select(LeaveRequest).where(
+            LeaveRequest.employee_code == leave.employee_code,
+            LeaveRequest.id != leave.id,
+            LeaveRequest.status == "APPROVED",
+        ).order_by(LeaveRequest.start_date.desc()).limit(1)
+    )).scalar_one_or_none()
+    last_leave = None
+    if last_leave_row:
+        last_leave = {
+            "start_date": last_leave_row.start_date.isoformat(),
+            "end_date":   last_leave_row.end_date.isoformat(),
+            "leave_type": last_leave_row.leave_type,
+            "days":       float(last_leave_row.days or 0),
+        }
 
     return {
         "category": category,
@@ -359,10 +386,12 @@ async def _leave_stats(db: AsyncSession, leave: LeaveRequest) -> dict:
         "pending_days": pending_days,
         "this_request_days": float(leave.days or 0),
         "remaining_after_request_text": remaining_text,
-        # 3-month rollup
-        "last_3_months": last_3_months,
-        "last_3_months_total_approved": last_3_months_total_approved,
-        "last_3_months_total_pending":  last_3_months_total_pending,
+        # most recent prior approved leave (None if first-ever)
+        "last_leave": last_leave,
+        # 6-month rollup
+        "last_6_months": last_6_months,
+        "last_6_months_total_approved": last_6_months_total_approved,
+        "last_6_months_total_pending":  last_6_months_total_pending,
     }
 
 
@@ -594,6 +623,202 @@ async def update_leave_policy(
     return {"entitlements": entitlements}
 
 
+# ── Dashboard / Analytics ─────────────────────────────────────────────────────
+
+_UNKNOWN = "—"
+
+
+async def _employee_directory(db: AsyncSession) -> dict[str, dict]:
+    """employee_code -> {name, department, team, section} for join-less aggregation."""
+    rows = (await db.execute(select(Employee))).scalars().all()
+    out: dict[str, dict] = {}
+    for e in rows:
+        out[e.employee_code] = {
+            "name": e.full_name or e.employee_code,
+            "department": e.department or _UNKNOWN,
+            "team": e.project_team or _UNKNOWN,
+            "section": e.section_name or _UNKNOWN,
+        }
+    return out
+
+
+def _month_end(y: int, m: int) -> date:
+    return date(y + (1 if m == 12 else 0), 1 if m == 12 else m + 1, 1) - timedelta(days=1)
+
+
+@router.get("/dashboard")
+async def leave_dashboard(
+    year: int | None = None,
+    payload: dict = Depends(require_monitor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Org-wide leave overview for the HR dashboard: KPIs, who's-on-leave-today,
+    monthly trend (by type), department breakdown, and executive summary."""
+    today = _now().date()
+    yr = year or today.year
+    y_start, y_end = date(yr, 1, 1), date(yr, 12, 31)
+
+    rows = (await db.execute(
+        select(LeaveRequest).where(
+            LeaveRequest.start_date <= y_end,
+            LeaveRequest.end_date >= y_start,
+        )
+    )).scalars().all()
+    directory = await _employee_directory(db)
+
+    def info(code: str) -> dict:
+        return directory.get(code, {"name": code, "department": _UNKNOWN, "team": _UNKNOWN, "section": _UNKNOWN})
+
+    approved = [r for r in rows if r.status == "APPROVED"]
+    pending = [r for r in rows if r.status.startswith("PENDING")]
+    approved_yr = [r for r in approved if r.start_date.year == yr]
+
+    on_leave_today = sorted(
+        (
+            {
+                "employeeCode": r.employee_code, "name": info(r.employee_code)["name"],
+                "department": info(r.employee_code)["department"], "leaveType": r.leave_type,
+                "startDate": r.start_date.isoformat(), "endDate": r.end_date.isoformat(),
+                "days": float(r.days or 0),
+            }
+            for r in approved if r.start_date <= today <= r.end_date
+        ),
+        key=lambda x: x["name"],
+    )
+
+    approved_this_month = sum(
+        float(r.days or 0) for r in approved_yr
+        if r.start_date.year == today.year and r.start_date.month == today.month
+    )
+    total_days_ytd = sum(float(r.days or 0) for r in approved_yr)
+
+    # Monthly trend (attributed by start_date month), broken down by category
+    monthly = []
+    for m in range(1, 13):
+        month_rows = [r for r in approved_yr if r.start_date.month == m]
+        by_type: dict[str, float] = {}
+        for r in month_rows:
+            cat = _leave_category(r.leave_type)
+            by_type[cat] = by_type.get(cat, 0.0) + float(r.days or 0)
+        monthly.append({
+            "month": f"{yr}-{m:02d}", "label": _month_label(yr, m),
+            "totalDays": round(sum(by_type.values()), 1), "count": len(month_rows),
+            "byType": {k: round(v, 1) for k, v in by_type.items()},
+        })
+
+    # Department / team breakdown
+    dept_map: dict[str, dict] = {}
+    for r in approved_yr:
+        d = info(r.employee_code)["department"]
+        bucket = dept_map.setdefault(d, {"department": d, "totalDays": 0.0, "count": 0, "people": set()})
+        bucket["totalDays"] += float(r.days or 0)
+        bucket["count"] += 1
+        bucket["people"].add(r.employee_code)
+    by_department = sorted(
+        (
+            {"department": b["department"], "totalDays": round(b["totalDays"], 1),
+             "count": b["count"], "employees": len(b["people"])}
+            for b in dept_map.values()
+        ),
+        key=lambda x: x["totalDays"], reverse=True,
+    )
+
+    # By type (year)
+    by_type_year: dict[str, float] = {}
+    for r in approved_yr:
+        cat = _leave_category(r.leave_type)
+        by_type_year[cat] = by_type_year.get(cat, 0.0) + float(r.days or 0)
+    by_type_year = {k: round(v, 1) for k, v in by_type_year.items()}
+
+    # Executive summary
+    taker_map: dict[str, float] = {}
+    for r in approved_yr:
+        taker_map[r.employee_code] = taker_map.get(r.employee_code, 0.0) + float(r.days or 0)
+    top_takers = sorted(
+        (
+            {"employeeCode": c, "name": info(c)["name"], "department": info(c)["department"], "days": round(d, 1)}
+            for c, d in taker_map.items()
+        ),
+        key=lambda x: x["days"], reverse=True,
+    )[:5]
+    decided = [r for r in rows if r.status in ("APPROVED", "REJECTED") and r.start_date.year == yr]
+    approval_rate = round(100 * len(approved_yr) / len(decided), 1) if decided else 0.0
+    most_used_type = max(by_type_year.items(), key=lambda kv: kv[1])[0] if by_type_year else _UNKNOWN
+
+    return {
+        "year": yr,
+        "summary": {
+            "pendingApproval": len(pending),
+            "onLeaveToday": len(on_leave_today),
+            "approvedThisMonth": round(approved_this_month, 1),
+            "totalDaysYtd": round(total_days_ytd, 1),
+            "employeesOnLeaveYtd": len(taker_map),
+        },
+        "onLeaveToday": on_leave_today,
+        "monthlyTrend": monthly,
+        "byDepartment": by_department,
+        "byType": by_type_year,
+        "executive": {
+            "totalDays": round(total_days_ytd, 1),
+            "totalRequests": len([r for r in rows if r.start_date.year == yr]),
+            "approvalRate": approval_rate,
+            "mostUsedType": most_used_type,
+            "topTakers": top_takers,
+        },
+    }
+
+
+@router.get("/calendar")
+async def leave_calendar(
+    month: str | None = None,
+    department: str | None = None,
+    payload: dict = Depends(require_monitor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-day approved-leave occupancy for a month (each multi-day leave is
+    expanded onto every day it covers within the month). Used for the daily /
+    monthly calendar view and the day drill-down."""
+    today = _now().date()
+    if month and len(month) >= 7:
+        y, m = int(month[:4]), int(month[5:7])
+    else:
+        y, m = today.year, today.month
+    win_start, win_end = date(y, m, 1), _month_end(y, m)
+
+    rows = (await db.execute(
+        select(LeaveRequest).where(
+            LeaveRequest.status == "APPROVED",
+            LeaveRequest.start_date <= win_end,
+            LeaveRequest.end_date >= win_start,
+        )
+    )).scalars().all()
+    directory = await _employee_directory(db)
+
+    days: dict[str, dict] = {}
+    for r in rows:
+        i = directory.get(r.employee_code, {"name": r.employee_code, "department": _UNKNOWN})
+        if department and i["department"] != department:
+            continue
+        d = max(r.start_date, win_start)
+        last = min(r.end_date, win_end)
+        while d <= last:
+            bucket = days.setdefault(d.isoformat(), {"count": 0, "people": []})
+            bucket["count"] += 1
+            bucket["people"].append({
+                "employeeCode": r.employee_code, "name": i["name"],
+                "department": i["department"], "leaveType": r.leave_type,
+            })
+            d += timedelta(days=1)
+
+    return {
+        "month": f"{y}-{m:02d}",
+        "daysInMonth": win_end.day,
+        "firstWeekday": win_start.weekday(),  # 0 = Monday
+        "days": days,
+        "departments": sorted({i["department"] for i in directory.values() if i["department"] != _UNKNOWN}),
+    }
+
+
 # ── PM Step ───────────────────────────────────────────────────────────────────
 
 @router.post("/{leave_id}/pm-approve")
@@ -622,6 +847,16 @@ async def pm_approve(
         recipients = await _hr_and_boss_emails(db)
         stakeholders = await _leave_stakeholder_emails(db, leave, body.actor_code)
         await _notify(db, recipients, subject, body_text, body_html, cc=_cc_for(recipients, stakeholders))
+    elif (await _chain_mode(db)) == "FULL":
+        leave.status = "PENDING_SPM"
+        stats = await _leave_stats(db, leave)
+        subject, body_text, body_html = leave_pm_approved_email(leave, next_step="SPM", stats=stats, actors=await _actors_for(db, leave))
+        recipients = await _spm_emails(db, body.actor_code)
+        stakeholders = await _leave_stakeholder_emails(db, leave, body.actor_code)
+        await _notify_with_links(
+            db, recipients, leave.id, "spm", subject, body_text, body_html,
+            cc=_cc_for(recipients, stakeholders),
+        )
     else:
         leave.status = "PENDING_DC"
         stats = await _leave_stats(db, leave)
@@ -692,7 +927,12 @@ async def spm_approve(
 
     stats = await _leave_stats(db, leave)
     subject, body_text, body_html = leave_spm_approved_email(leave, stats=stats, actors=await _actors_for(db, leave))
-    await _notify_role(db, "DC", subject, body_text, body_html)
+    recipients = await _pd_emails(db, leave.employee_code, leave.pm_approved_by or body.actor_code)
+    stakeholders = await _leave_stakeholder_emails(db, leave, body.actor_code)
+    await _notify_with_links(
+        db, recipients, leave.id, "pd", subject, body_text, body_html,
+        cc=_cc_for(recipients, stakeholders),
+    )
     await db.commit()
     return {"success": True, "leave": _leave_dict(leave)}
 
@@ -897,6 +1137,23 @@ async def pending_for_me(
         )).scalars().all()
         pending.extend(pm_rows)
 
+        # SPM step (FULL chain): the PM whose approval is pending SPM review is a
+        # direct report of this approver (the Senior PM).
+        spm_rows = (await db.execute(
+            select(LeaveRequest).where(
+                LeaveRequest.status == "PENDING_SPM",
+                LeaveRequest.pm_approved_by.in_(direct),
+            ).order_by(LeaveRequest.created_at.desc())
+        )).scalars().all()
+        pending.extend(spm_rows)
+
+    if role in {"PROJECT_ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN"}:
+        spm_role_rows = (await db.execute(
+            select(LeaveRequest).where(LeaveRequest.status == "PENDING_SPM")
+            .order_by(LeaveRequest.created_at.desc())
+        )).scalars().all()
+        pending.extend(spm_role_rows)
+
     if role in {"DIRECTOR", "DC", "PROJECT_DIRECTOR", "SUPER_ADMIN", "SYSTEM_ADMIN"}:
         pd_rows = (await db.execute(
             select(LeaveRequest).where(LeaveRequest.status == "PENDING_DC")
@@ -957,7 +1214,7 @@ async def get_leave_by_token(token: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, "Leave request not found.")
 
     step = payload["step"]
-    expected_status = {"pm": "PENDING_PM", "pd": "PENDING_DC", "hr": "PENDING_HR"}[step]
+    expected_status = {"pm": "PENDING_PM", "spm": "PENDING_SPM", "pd": "PENDING_DC", "hr": "PENDING_HR"}[step]
     can_act = leave.status == expected_status
 
     stats = await _leave_stats(db, leave)
@@ -1003,19 +1260,22 @@ async def act_leave_by_token(
     if action == "reject" and not (body.reject_reason or "").strip():
         raise HTTPException(400, "Reject reason is required.")
 
-    expected_status = {"pm": "PENDING_PM", "pd": "PENDING_DC", "hr": "PENDING_HR"}[step]
+    expected_status = {"pm": "PENDING_PM", "spm": "PENDING_SPM", "pd": "PENDING_DC", "hr": "PENDING_HR"}[step]
     if leave.status != expected_status:
         raise HTTPException(400, f"This link is no longer valid. Current status is {leave.status}.")
 
     if action == "reject":
         leave.status = "REJECTED"
-        leave.reject_at_step = {"pm": "PM", "pd": "PD", "hr": "HR"}[step]
+        leave.reject_at_step = {"pm": "PM", "spm": "SPM", "pd": "PD", "hr": "HR"}[step]
         leave.reject_reason = body.reject_reason.strip()
         leave.reviewed_by = approver_code
         leave.reviewed_at = _now()
         if step == "pm":
             leave.pm_approved_by = approver_code
             leave.pm_approved_at = _now()
+        elif step == "spm":
+            leave.spm_approved_by = approver_code
+            leave.spm_approved_at = _now()
         elif step == "pd":
             leave.dc_approved_by = approver_code
             leave.dc_approved_at = _now()
@@ -1040,6 +1300,16 @@ async def act_leave_by_token(
             recipients = await _hr_and_boss_emails(db)
             stakeholders = await _leave_stakeholder_emails(db, leave, approver_code)
             await _notify(db, recipients, subject, txt, html, cc=_cc_for(recipients, stakeholders))
+        elif (await _chain_mode(db)) == "FULL":
+            leave.status = "PENDING_SPM"
+            stats = await _leave_stats(db, leave)
+            subject, txt, html = leave_pm_approved_email(leave, next_step="SPM", stats=stats, actors=await _actors_for(db, leave))
+            spm_recipients = await _spm_emails(db, approver_code)
+            stakeholders = await _leave_stakeholder_emails(db, leave, approver_code)
+            await _notify_with_links(
+                db, spm_recipients, leave.id, "spm", subject, txt, html,
+                cc=_cc_for(spm_recipients, stakeholders),
+            )
         else:
             leave.status = "PENDING_DC"
             stats = await _leave_stats(db, leave)
@@ -1050,6 +1320,18 @@ async def act_leave_by_token(
                 db, pd_recipients, leave.id, "pd", subject, txt, html,
                 cc=_cc_for(pd_recipients, stakeholders),
             )
+    elif step == "spm":
+        leave.spm_approved_by = approver_code
+        leave.spm_approved_at = _now()
+        leave.status = "PENDING_DC"
+        stats = await _leave_stats(db, leave)
+        subject, txt, html = leave_spm_approved_email(leave, stats=stats, actors=await _actors_for(db, leave))
+        pd_recipients = await _pd_emails(db, leave.employee_code, leave.pm_approved_by or approver_code)
+        stakeholders = await _leave_stakeholder_emails(db, leave, approver_code)
+        await _notify_with_links(
+            db, pd_recipients, leave.id, "pd", subject, txt, html,
+            cc=_cc_for(pd_recipients, stakeholders),
+        )
     elif step == "pd":
         leave.status = "APPROVED"
         leave.dc_approved_by = approver_code

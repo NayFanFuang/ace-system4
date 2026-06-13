@@ -69,30 +69,45 @@ def _leave_detail_rows(leave: "LeaveRequest") -> str:
 """
 
 
+def _last_leave_text(last_leave: dict | None) -> str:
+    if not last_leave:
+        return "None (no prior approved leave)"
+    days = last_leave.get("days", 0) or 0
+    return (
+        f"{last_leave['start_date']} → {last_leave['end_date']} · "
+        f"{last_leave['leave_type']} · {days:.1f} day(s)"
+    )
+
+
 def _leave_stats_text(stats: dict | None) -> str:
     if not stats:
         return ""
     base = (
+        f"\nRemaining {stats.get('category', 'leave')} balance: {stats['remaining_after_request_text']}\n"
         "\nLeave statistics (year):\n"
-        f"  Year entitlement : {stats['entitlement_text']}\n"
-        f"  Approved used    : {stats['approved_used']:.1f} day(s)\n"
-        f"  Pending requests : {stats['pending_days']:.1f} day(s)\n"
-        f"  This request     : {stats['this_request_days']:.1f} day(s)\n"
-        f"  Remaining        : {stats['remaining_after_request_text']}\n"
+        f"  Year entitlement  : {stats['entitlement_text']}\n"
+        f"  Approved used     : {stats['approved_used']:.1f} day(s)\n"
+        f"  Pending requests  : {stats['pending_days']:.1f} day(s)\n"
+        f"  This request      : {stats['this_request_days']:.1f} day(s)\n"
+        f"  Remaining         : {stats['remaining_after_request_text']}\n"
+        f"  Most recent leave : {_last_leave_text(stats.get('last_leave'))}\n"
     )
 
-    history = stats.get("last_3_months") or []
+    history = stats.get("last_6_months") or []
     if not history:
         return base
 
-    lines = ["\nPast 3 months ({} only):".format(stats.get("category", "category"))]
+    lines = ["\nPast 6 months ({} only):".format(stats.get("category", "category"))]
     for item in history:
         lines.append(
-            f"  {item['label']:8} : approved {item['approved']:.1f} d · pending {item['pending']:.1f} d"
+            f"  {item['label']:9} : approved {item['approved']:.1f} d · "
+            f"pending {item['pending']:.1f} d · total {item.get('total', item['approved'] + item['pending']):.1f} d"
         )
+    total_approved = stats['last_6_months_total_approved']
+    total_pending = stats['last_6_months_total_pending']
     lines.append(
-        f"  {'Total':8} : approved {stats['last_3_months_total_approved']:.1f} d · "
-        f"pending {stats['last_3_months_total_pending']:.1f} d"
+        f"  {'Total':9} : approved {total_approved:.1f} d · "
+        f"pending {total_pending:.1f} d · total {total_approved + total_pending:.1f} d"
     )
     return base + "\n".join(lines) + "\n"
 
@@ -100,6 +115,18 @@ def _leave_stats_text(stats: dict | None) -> str:
 def _leave_stats_html(stats: dict | None) -> str:
     if not stats:
         return ""
+    category = stats.get("category", "category")
+
+    # Prominent remaining-balance summary callout
+    remaining_callout = f"""
+<table style="border-collapse:collapse;margin:14px 0;width:100%">
+  <tr><td style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:12px 16px">
+    <span style="color:#047857;font-size:13px;font-weight:700">Remaining {category} balance</span>
+    <span style="color:#065f46;font-size:20px;font-weight:900;float:right">{stats['remaining_after_request_text']}</span>
+  </td></tr>
+</table>
+"""
+
     rows = [
         ("Leave Category", stats["category"]),
         ("Year Entitlement", stats["entitlement_text"]),
@@ -107,6 +134,7 @@ def _leave_stats_html(stats: dict | None) -> str:
         ("Pending Requests", f"{stats['pending_days']:.1f} day(s)"),
         ("This Request", f"{stats['this_request_days']:.1f} day(s)"),
         ("Remaining After This Request", stats["remaining_after_request_text"]),
+        ("Most Recent Leave", _last_leave_text(stats.get("last_leave"))),
     ]
     cells = "".join(
         f"<tr><td style='padding:6px 14px 6px 0;color:#667085'>{label}</td>"
@@ -120,41 +148,46 @@ def _leave_stats_html(stats: dict | None) -> str:
 </table>
 """
 
-    history = stats.get("last_3_months") or []
+    history = stats.get("last_6_months") or []
     if not history:
-        return year_table
+        return remaining_callout + year_table
 
     head_cells = (
         "<tr style='background:#f8fafc;color:#475569;text-align:left'>"
         "<th style='padding:7px 12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em'>Month</th>"
         "<th style='padding:7px 12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:right'>Approved</th>"
         "<th style='padding:7px 12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:right'>Pending</th>"
+        "<th style='padding:7px 12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:right'>Total</th>"
         "</tr>"
     )
     body_rows = "".join(
         f"<tr style='border-top:1px solid #e2e8f0'>"
         f"<td style='padding:7px 12px;color:#0f172a;font-weight:700'>{item['label']}</td>"
-        f"<td style='padding:7px 12px;color:#0f172a;text-align:right;font-variant-numeric:tabular-nums'>{item['approved']:.1f}</td>"
-        f"<td style='padding:7px 12px;color:#0f172a;text-align:right;font-variant-numeric:tabular-nums'>{item['pending']:.1f}</td>"
+        f"<td style='padding:7px 12px;color:#0f172a;text-align:right;font-variant-numeric:tabular-nums'>{item['approved']:.1f} d</td>"
+        f"<td style='padding:7px 12px;color:#0f172a;text-align:right;font-variant-numeric:tabular-nums'>{item['pending']:.1f} d</td>"
+        f"<td style='padding:7px 12px;color:#0f172a;text-align:right;font-weight:700;font-variant-numeric:tabular-nums'>{item.get('total', item['approved'] + item['pending']):.1f} d</td>"
         "</tr>"
         for item in history
     )
+    total_approved = stats['last_6_months_total_approved']
+    total_pending = stats['last_6_months_total_pending']
     total_row = (
         "<tr style='background:#eff6ff;border-top:2px solid #93c5fd'>"
-        "<td style='padding:8px 12px;color:#1d4ed8;font-weight:900'>Total (3 mo.)</td>"
-        f"<td style='padding:8px 12px;color:#1d4ed8;text-align:right;font-weight:900;font-variant-numeric:tabular-nums'>{stats['last_3_months_total_approved']:.1f}</td>"
-        f"<td style='padding:8px 12px;color:#1d4ed8;text-align:right;font-weight:900;font-variant-numeric:tabular-nums'>{stats['last_3_months_total_pending']:.1f}</td>"
+        "<td style='padding:8px 12px;color:#1d4ed8;font-weight:900'>Total (6 mo.)</td>"
+        f"<td style='padding:8px 12px;color:#1d4ed8;text-align:right;font-weight:900;font-variant-numeric:tabular-nums'>{total_approved:.1f} d</td>"
+        f"<td style='padding:8px 12px;color:#1d4ed8;text-align:right;font-weight:900;font-variant-numeric:tabular-nums'>{total_pending:.1f} d</td>"
+        f"<td style='padding:8px 12px;color:#1d4ed8;text-align:right;font-weight:900;font-variant-numeric:tabular-nums'>{total_approved + total_pending:.1f} d</td>"
         "</tr>"
     )
     history_table = f"""
-<h3 style="margin:18px 0 8px;color:#344054;font-size:15px">Past 3 Months — {stats.get('category', 'category')} only</h3>
+<h3 style="margin:18px 0 8px;color:#344054;font-size:15px">Past 6 Months — {category} only</h3>
 <table style="border-collapse:collapse;margin:8px 0 14px;width:100%;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
   {head_cells}
   {body_rows}
   {total_row}
 </table>
 """
-    return year_table + history_table
+    return remaining_callout + year_table + history_table
 
 
 def _leave_category(leave_type: str) -> str:
@@ -183,9 +216,13 @@ def _process_steps(leave: "LeaveRequest") -> list[tuple[str, str]]:
             ("APPROVED", "Approved"),
             ("ACK", "HR + Boss Acknowledge"),
         ]
+    # FULL chain (PM → Senior PM → DC) is detectable per-leave: the request is
+    # either currently awaiting SPM or already carries an SPM approval.
+    has_spm = leave.status == "PENDING_SPM" or bool(getattr(leave, "spm_approved_by", None))
     return [
         ("SUBMIT", "Submit"),
         ("PM", "PM Approval"),
+        *([("SPM", "Senior PM Approval")] if has_spm else []),
         ("PD", "PD / Dept. Head Approval"),
         ("APPROVED", "Approved"),
         ("ACK", "HR + Boss Acknowledge"),
@@ -216,8 +253,12 @@ def _step_status(leave: "LeaveRequest", step_key: str) -> str:
         return "current" if step_key == "HR" else "todo"
     if leave.status == "PENDING_PM":
         return "current" if step_key == "PM" else "todo"
-    if leave.status == "PENDING_DC":
+    if leave.status == "PENDING_SPM":
         if step_key == "PM":
+            return "done"
+        return "current" if step_key == "SPM" else "todo"
+    if leave.status == "PENDING_DC":
+        if step_key in ("PM", "SPM"):
             return "done"
         return "current" if step_key == "PD" else "todo"
     if leave.status == "APPROVED":
@@ -299,7 +340,7 @@ def _actor(code: str | None, actors: dict[str, str] | None) -> str:
 
 def leave_pm_approved_email(leave: "LeaveRequest", next_step: str = "PD", skip_dc: bool = False, stats: dict | None = None, actors: dict[str, str] | None = None) -> tuple[str, str, str]:
     note = ""
-    step_labels = {"PD": "PD / Department Head Approval", "DC": "PD / Department Head Approval", "HR": "HR Acknowledgement"}
+    step_labels = {"SPM": "Senior PM Approval", "PD": "PD / Department Head Approval", "DC": "PD / Department Head Approval", "HR": "HR Acknowledgement"}
     step_label = step_labels.get(next_step, f"{next_step} Review")
     pm_display = _actor(leave.pm_approved_by, actors)
     subject = f"[Leave Request] PM Approved — {leave.employee_name}{note}"

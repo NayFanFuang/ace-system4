@@ -29,9 +29,9 @@ def create_leave_token(
 ) -> str:
     """Sign a JWT for one approver to act on one leave at one step.
 
-    step is one of: "pm", "pd", "hr".
+    step is one of: "pm", "spm", "pd", "hr".
     """
-    if step not in ("pm", "pd", "hr"):
+    if step not in ("pm", "spm", "pd", "hr"):
         raise ValueError(f"Invalid step: {step!r}")
     now = datetime.now(timezone.utc)
     payload = {

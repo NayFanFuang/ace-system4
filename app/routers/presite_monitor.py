@@ -9,7 +9,7 @@ State machine:
 import asyncio
 import os
 import re as _re_path
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
@@ -197,6 +197,30 @@ async def list_tracking(
     data = [_row_to_dict(r, now) for r in rows]
     if sla_breach is not None:
         data = [d for d in data if d["sla_breached"] == sla_breach]
+
+    # PAC milestones are owned by the DTA cluster (single source of truth). Override the
+    # per-row pac-stage display fields from dta_clusters so presite-monitor mirrors the DTA
+    # Update page rather than the (deprecated) per-tracking pac-stage columns.
+    from app.models.dta_cluster import DtaCluster
+    pac_names = {(r.cluster_key or r.rf_cluster_name) for r in rows
+                 if (r.work_type or "").upper() == "PAC" and (r.cluster_key or r.rf_cluster_name)}
+    if pac_names:
+        dmap = {d.rf_cluster_name: d for d in (await db.execute(
+            select(DtaCluster).where(DtaCluster.rf_cluster_name.in_(pac_names)))).scalars().all()}
+        for d in data:
+            if (d.get("work_type") or "").upper() != "PAC":
+                continue
+            dc = dmap.get(d.get("cluster_key") or d.get("rf_cluster_name"))
+            if not dc:
+                continue
+            d["pa_open_at"] = _iso(dc.pa_open)
+            d["pa_closed_at"] = _iso(dc.tuning_closed)
+            d["report_submit_at"] = _iso(dc.pac_submit)
+            d["report_approved_at"] = _iso(dc.pac_approved)
+            by = dc.progress_edited_by
+            d["pa_open_by"] = d["pa_closed_by"] = d["report_submit_by"] = d["report_approved_by"] = by
+            d["pac_milestone_source"] = "DTA"
+            d["dta_progress_source"] = dc.progress_source
 
     # Attach session rounds for each row (SSV + PAC; PAC has dynamic round count)
     tracking_ids = [r.id for r in rows]
@@ -389,7 +413,8 @@ async def _mark_dte_ready(db: AsyncSession, row: "DtePresiteTracking", now: date
     )).scalar_one_or_none()
     if c and c.dte_ready_at is None:
         c.dte_ready_at = now
-        c.dte_ready_by = actor_name
+        # credit the DTE who did the work, not whoever clicked approve
+        c.dte_ready_by = row.assigned_dte_name or actor_name
 
 
 @router.post("/tracking/{tracking_id}/advance")
@@ -584,11 +609,17 @@ async def undo(
 # ────────────────────────────────────────────────────────────────────────────
 # Auto-seed — called from employees.py:mark-done hook
 # ────────────────────────────────────────────────────────────────────────────
-async def seed_tracking_from_po(db: AsyncSession, po: ProjectPO) -> DtePresiteTracking | None:
+async def seed_tracking_from_po(db: AsyncSession, po: ProjectPO,
+                                force_cluster_key: str | None = None) -> DtePresiteTracking | None:
     """Idempotent seed of tracking row from a PO.
 
       SSV: 1 PO = 1 DU + 1 item_dis = 1 tracking row (key=po_id)
       PAC: 1 cluster = N POs = 1 tracking row (key=cluster_key=cluster_site)
+
+    force_cluster_key (PAC only): use this exact rf_cluster_name instead of resolving it
+    from the PO's site. Needed for "Flash_RAN_EAS" POs whose cluster_site maps to a Flash
+    alias (EAS-FLASH-xxxx) rather than the real master cluster (EAS0142-Full-1). The caller
+    (cluster-plan) already knows the correct cluster, so it passes it through.
            When called with any PO of the cluster, attaches to (or creates) the cluster row.
     """
     if not po:
@@ -615,10 +646,11 @@ async def seed_tracking_from_po(db: AsyncSession, po: ProjectPO) -> DtePresiteTr
             break
 
     # Canonical RF Cluster Name (from ISDP Col I) wins; cluster_site is fallback.
-    canonical_cluster = (site.rf_cluster_name if site else None) or po.cluster_site
+    # An explicit force_cluster_key (PAC) overrides resolution entirely.
+    canonical_cluster = force_cluster_key or (site.rf_cluster_name if site else None) or po.cluster_site
 
     if is_pac:
-        cluster_key = canonical_cluster
+        cluster_key = force_cluster_key or canonical_cluster
         if not cluster_key:
             return None
         existing = (await db.execute(
@@ -755,6 +787,7 @@ async def plan_pac_cluster(
         body.planned_duration_days,
     )
 
+    # Primary match: legacy "B_Cluster/SSOA" POs whose cluster_site IS the cluster name.
     pos = (await db.execute(
         select(ProjectPO).where(
             func.upper(ProjectPO.cluster_site) == body.cluster_key.upper(),
@@ -762,8 +795,26 @@ async def plan_pac_cluster(
             ProjectPO.item_dis.op("~*")(r"^[AB]_(Cluster|SSOA) "),
         )
     )).scalars().all()
+
+    # Fallback bridge: newer "Flash_RAN_EAS / B_Pre DT" POs store cluster_site as a SITE
+    # name (e.g. RYG0204_Flash_RAN_EAS R3), not the rf_cluster_name. Resolve them the same
+    # way billing does — site prefix → project_sites.rf_cluster_name == this cluster.
     if not pos:
-        raise HTTPException(404, f"No PAC Cluster/SSOA POs found for cluster '{body.cluster_key}'")
+        site_codes = (await db.execute(
+            select(ProjectSite.site_code).where(
+                func.upper(ProjectSite.rf_cluster_name) == body.cluster_key.upper()
+            )
+        )).scalars().all()
+        prefixes = {str(sc).split("_")[0].upper() for sc in site_codes if sc}
+        if prefixes:
+            pac_pos = (await db.execute(
+                select(ProjectPO).where(ProjectPO.work_type == "PAC")
+            )).scalars().all()
+            pos = [p for p in pac_pos
+                   if p.cluster_site and str(p.cluster_site).split("_")[0].upper() in prefixes]
+
+    if not pos:
+        raise HTTPException(404, f"No PAC POs found for cluster '{body.cluster_key}'")
 
     now = datetime.now(timezone.utc)
     for po in pos:
@@ -778,8 +829,10 @@ async def plan_pac_cluster(
             po.approved_at = now
 
     await db.flush()
-    # Seed the cluster tracking from the first PO (idempotent on cluster_key)
-    tracking = await seed_tracking_from_po(db, pos[0])
+    # Seed the cluster tracking from the first PO (idempotent on cluster_key).
+    # Pass the cluster the caller asked for so Flash_RAN POs don't get filed under
+    # their EAS-FLASH alias instead of the real master cluster.
+    tracking = await seed_tracking_from_po(db, pos[0], force_cluster_key=body.cluster_key)
 
     # Auto-sync ClockApp prerequisites (assignment + auth_user + clock_site)
     # so DTE sees the cluster site in the ClockApp PER_SITE list immediately.
@@ -968,41 +1021,14 @@ async def pac_stage(
     payload: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    role = payload.get("role")
-    if role not in ROLE_TL:
-        raise HTTPException(403, "Only TL/PM/Admin may set PAC stage")
-    row = (await db.execute(select(DtePresiteTracking).where(DtePresiteTracking.id == tracking_id))).scalar_one_or_none()
-    if not row:
-        raise HTTPException(404, "Tracking row not found")
-    now = datetime.now(timezone.utc)
-    actor = payload.get("employee_code") or payload.get("sub")
-    actor_name = payload.get("name") or actor
-    action = (body.action or "").lower().strip()
-
-    if action == "pa-open":
-        row.pa_open_at = now; row.pa_open_by = actor
-    elif action == "pa-closed":
-        row.pa_closed_at = now; row.pa_closed_by = actor
-    elif action == "report-submit":
-        row.report_submit_at = now; row.report_submit_by = actor
-    elif action == "report-approve":
-        row.report_approved_at = now; row.report_approved_by = actor
-    elif action == "undo-pa-open":
-        row.pa_open_at = None; row.pa_open_by = None
-    elif action == "undo-pa-closed":
-        row.pa_closed_at = None; row.pa_closed_by = None
-    elif action == "undo-report-submit":
-        row.report_submit_at = None; row.report_submit_by = None
-    elif action == "undo-report-approve":
-        row.report_approved_at = None; row.report_approved_by = None
-    else:
-        raise HTTPException(400, f"Unknown PAC action: {action}")
-
-    _record_history(db, tracking_id=row.id, stage=row.current_stage, action=action,
-                    actor_code=actor, actor_name=actor_name, notes=body.notes)
-    await db.commit()
-    await db.refresh(row)
-    return _row_to_dict(row, now)
+    # DEPRECATED: PAC milestones (PA Open / PA Closed / Report Submitted / Report Approved) are now
+    # owned by the DTA cluster — edited at /project/presite-monitor-dta/update via
+    # PUT /api/presite/dta/clusters/{name}/progress. presite-monitor displays them read-only.
+    raise HTTPException(
+        410,
+        "PAC stages are now edited in the DTA Update page "
+        "(PUT /api/presite/dta/clusters/{name}/progress). This per-tracking endpoint is retired.",
+    )
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -2010,6 +2036,10 @@ def _dta_cluster_to_dict(c: "DtaCluster", rounds: list["DtaClusterRound"]) -> di
         "geo": 1 if (c.lat is not None and c.lng is not None) else 0,
         "po_number": c.po_number,
         "owner_source": c.owner_source,
+        "assigned_employee_code": c.assigned_employee_code,
+        "progress_source": c.progress_source,
+        "progress_edited_at": c.progress_edited_at.isoformat() if c.progress_edited_at else None,
+        "progress_edited_by": c.progress_edited_by,
         "dte_ready_at": c.dte_ready_at.isoformat() if c.dte_ready_at else None,
         "dte_ready_by": c.dte_ready_by,
     }
@@ -2074,6 +2104,7 @@ async def dta_assign(
     """
     if payload.get("role") not in ROLE_ASSIGN:
         raise HTTPException(403, "Only PM/Project/Admin may assign cluster owners")
+    from app.models.auth_user import AuthUser
     actor = payload.get("name") or payload.get("employee_code") or payload.get("sub")
     now = datetime.now(timezone.utc)
 
@@ -2092,15 +2123,187 @@ async def dta_assign(
             c.owner_source = "EXCEL"
             c.assigned_at = None
             c.assigned_by = None
+            c.assigned_employee_code = None
         else:
             c.dta_name = name
             c.owner_source = "MANUAL"
             c.assigned_at = now
             c.assigned_by = actor
+            # best-effort: link the assignee to a login so /dta/my-clusters can scope by code
+            c.assigned_employee_code = (await db.execute(
+                select(AuthUser.employee_code).where(
+                    func.lower(func.concat(AuthUser.first_name, " ", AuthUser.last_name)) == name.lower()
+                ).limit(1)
+            )).scalar_one_or_none()
         updated.append(item.cluster)
 
     await db.commit()
     return {"ok": True, "updated": len(updated), "missing": missing, "by": actor}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# DTA self-service — "Update My Progress" page (my-clusters + progress PUT)
+# ────────────────────────────────────────────────────────────────────────────
+def _is_admin(p: dict) -> bool:
+    return p.get("role") in ROLE_ASSIGN
+
+
+def _emp_of(p: dict) -> str | None:
+    return p.get("employee_code") or p.get("sub")
+
+
+def _owns(c: "DtaCluster", p: dict) -> bool:
+    """A DTA owns a cluster if their employee_code or display-name matches; admins own all."""
+    if _is_admin(p):
+        return True
+    emp, name = _emp_of(p), p.get("name")
+    return bool((emp and c.assigned_employee_code == emp) or (name and c.dta_name == name))
+
+
+_MS_KEYS = ["site_onair", "cluster_ready", "dt_gen", "dt_approved", "init_test", "pa_open",
+            "tuning_closed", "pac_report", "pac_submit", "pac_approved"]
+
+
+@router.get("/dta/my-clusters")
+async def dta_my_clusters(
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_user),
+):
+    """Clusters the logged-in DTA owns (admins see all) — scoped by assigned_employee_code OR dta_name.
+    A cluster only 'starts' (appears here) once it has a Cluster Ready date; planning/assignment is
+    done by PM/TL on the Owner (Assign) tab at /project/presite-monitor-dta."""
+    q = select(DtaCluster).where(DtaCluster.cluster_ready.isnot(None)).order_by(DtaCluster.rf_cluster_name)
+    if not _is_admin(payload):
+        emp, name = _emp_of(payload), payload.get("name")
+        conds = []
+        if emp:
+            conds.append(DtaCluster.assigned_employee_code == emp)
+        if name:
+            conds.append(DtaCluster.dta_name == name)
+        if not conds:
+            return {"count": 0, "as_of": None, "clusters": []}
+        q = q.where(or_(*conds))
+
+    cl_rows = (await db.execute(q)).scalars().all()
+    names = [c.rf_cluster_name for c in cl_rows]
+    rd_rows = []
+    if names:
+        rd_rows = (await db.execute(select(DtaClusterRound).where(
+            DtaClusterRound.rf_cluster_name.in_(names)).order_by(
+            DtaClusterRound.rf_cluster_name, DtaClusterRound.round_no))).scalars().all()
+    by_cluster: dict[str, list] = {}
+    for r in rd_rows:
+        by_cluster.setdefault(r.rf_cluster_name, []).append(r)
+    clusters = [_dta_cluster_to_dict(c, by_cluster.get(c.rf_cluster_name, [])) for c in cl_rows]
+
+    # attach the site codes that make up each cluster (DTA wants to see them, not just the count)
+    if names:
+        site_rows = (await db.execute(
+            select(ProjectSite.rf_cluster_name, ProjectSite.site_code, ProjectSite.site_name,
+                   ProjectSite.lat, ProjectSite.lng, ProjectSite.province)
+            .where(ProjectSite.rf_cluster_name.in_(names))
+            .order_by(ProjectSite.rf_cluster_name, ProjectSite.site_code)
+        )).all()
+        sites_by: dict[str, list] = {}
+        for r in site_rows:
+            sites_by.setdefault(r.rf_cluster_name, []).append({
+                "site_code": r.site_code, "site_name": r.site_name, "province": r.province,
+                "lat": float(r.lat) if r.lat is not None else None,
+                "lng": float(r.lng) if r.lng is not None else None,
+            })
+        for cd in clusters:
+            cd["sites"] = sites_by.get(cd["code"], [])
+
+    as_of = max((c.as_of_date for c in cl_rows if c.as_of_date), default=None)
+    return {"count": len(clusters), "as_of": as_of.isoformat() if as_of else None, "clusters": clusters}
+
+
+class DtaRoundIn(BaseModel):
+    round_no: int
+    cr_date: date | None = None
+    tuning_done: date | None = None
+    compare_done: date | None = None
+    discuss_date: date | None = None
+    pa_closed: int | None = None
+    pa_added: int | None = None
+    test_engineer: str | None = None
+
+
+class DtaProgressIn(BaseModel):
+    site_onair: date | None = None
+    cluster_ready: date | None = None
+    dt_gen: date | None = None
+    dt_approved: date | None = None
+    init_test: date | None = None
+    pa_open: date | None = None
+    tuning_closed: date | None = None
+    pac_report: date | None = None
+    pac_submit: date | None = None
+    pac_approved: date | None = None
+    # plan / payment-trigger target dates (app-ownable once system-native)
+    plan_pa_open: date | None = None
+    plan_pa_closed: date | None = None
+    plan_pac_approved: date | None = None
+    rounds: list[DtaRoundIn] | None = None   # None = leave rounds untouched; [] = clear
+
+
+@router.put("/dta/clusters/{cluster_name}/progress")
+async def dta_update_progress(
+    cluster_name: str,
+    body: DtaProgressIn,
+    payload: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """DTA self-service: set milestone dates + PA-loop rounds. Marks the cluster system-native
+    (progress_source='MANUAL') so the Excel ETL stops overwriting its progress. Phase/health/status
+    are recomputed server-side (status auto-derived from milestones — never typed)."""
+    from app.services.dta_progress import recompute_auto
+
+    c = (await db.execute(select(DtaCluster).where(DtaCluster.rf_cluster_name == cluster_name))).scalar_one_or_none()
+    if not c:
+        raise HTTPException(404, "Cluster not found")
+    if not _owns(c, payload):
+        raise HTTPException(403, "Not your cluster")
+
+    for k in _MS_KEYS:
+        setattr(c, k, getattr(body, k))
+    for k in ("plan_pa_open", "plan_pa_closed", "plan_pac_approved"):
+        setattr(c, k, getattr(body, k))
+
+    if body.rounds is not None:
+        nums = [r.round_no for r in body.rounds]
+        if len(nums) != len(set(nums)):
+            raise HTTPException(400, "Duplicate round_no in payload")
+        existing = (await db.execute(select(DtaClusterRound).where(
+            DtaClusterRound.rf_cluster_name == cluster_name))).scalars().all()
+        for r in existing:
+            await db.delete(r)
+        await db.flush()
+        for r in body.rounds:
+            db.add(DtaClusterRound(
+                rf_cluster_name=cluster_name, round_no=r.round_no, cr_date=r.cr_date,
+                tuning_done=r.tuning_done, compare_done=r.compare_done, discuss_date=r.discuss_date,
+                pa_closed=r.pa_closed, pa_added=r.pa_added, test_engineer=r.test_engineer))
+        await db.flush()
+
+    rounds_now = (await db.execute(select(DtaClusterRound).where(
+        DtaClusterRound.rf_cluster_name == cluster_name).order_by(DtaClusterRound.round_no))).scalars().all()
+    ms = {k: getattr(c, k) for k in _MS_KEYS}
+    d = recompute_auto(ms, rounds_now)
+    c.status = d["status"]
+    c.current_phase = d["current_phase"]
+    c.pa_round = d["pa_round"]
+    c.health = d["health"]
+    c.age_at_phase = d["age_at_phase"]
+    c.age_total = d["age_total"]
+    c.progress_source = "MANUAL"
+    c.progress_edited_at = datetime.now(timezone.utc)
+    c.progress_edited_by = payload.get("name") or _emp_of(payload)
+
+    await db.commit()
+    rounds = (await db.execute(select(DtaClusterRound).where(
+        DtaClusterRound.rf_cluster_name == cluster_name).order_by(DtaClusterRound.round_no))).scalars().all()
+    return _dta_cluster_to_dict(c, rounds)
 
 
 # ────────────────────────────────────────────────────────────────────────────

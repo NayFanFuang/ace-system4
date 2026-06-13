@@ -643,17 +643,6 @@ const HR_NAV = [
   { id: 'attendance',       label: 'Attendance',        icon: CalendarDays },
   { id: 'organization',     label: 'Organization',      icon: FolderTree },
   { id: 'leave',            label: 'Leave',             icon: Heart },
-  { id: 'recruitment',      label: 'Recruitment',       icon: UserPlus },
-  { id: 'performance',      label: 'Performance',       icon: ArrowUpRight },
-  { id: 'learning',         label: 'Learning',          icon: GraduationCap },
-  { id: 'contracts',        label: 'Contracts',         icon: FileCheck2 },
-  { id: 'documents',        label: 'Documents',         icon: BookOpen },
-  { id: 'payroll',          label: 'Payroll',           icon: Wallet },
-  { id: 'benefits',         label: 'Benefits',          icon: Stethoscope },
-  { id: 'assets',           label: 'Assets',            icon: Layers },
-  { id: 'compliance',       label: 'Compliance',        icon: IdCard },
-  { id: 'reports',          label: 'Reports',           icon: BriefcaseBusiness },
-  { id: 'settings',         label: 'Settings',          icon: Settings },
 ]
 
 const ACE_GRADIENT = 'linear-gradient(135deg, #2447d8 0%, #6d3f8f 48%, #c0392b 100%)'
@@ -4297,6 +4286,290 @@ function LeavePolicyPanel({ showToast }) {
   )
 }
 
+const LEAVE_TYPE_COLORS = {
+  'Annual Leave': '#2447d8',
+  'Sick Leave': '#d97706',
+  'Personal Leave': '#16a34a',
+  'Other Leave': '#6d3f8f',
+}
+const LEAVE_DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function leaveTypeColor(t) { return LEAVE_TYPE_COLORS[t] || '#98a2b3' }
+
+function LeaveCard({ title, action, children }) {
+  return (
+    <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: 16, flexShrink: 0 }}>
+      {(title || action) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ fontWeight: 900, color: '#1d2939', marginRight: 'auto' }}>{title}</div>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
+function LeaveMonthlyTrend({ months = [] }) {
+  const max = Math.max(1, ...months.map(m => m.totalDays || 0))
+  const types = ['Annual Leave', 'Sick Leave', 'Personal Leave', 'Other Leave']
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 150, padding: '4px 0' }}>
+        {months.map(m => {
+          const total = m.totalDays || 0
+          const barH = Math.round((total / max) * 130)
+          return (
+            <div key={m.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 0 }}
+                 title={`${m.label}: ${total} day(s) · ${m.count} request(s)`}>
+              <div style={{ fontSize: '.62rem', color: '#667085', fontWeight: 800 }}>{total ? total : ''}</div>
+              <div style={{ width: '100%', maxWidth: 26, height: Math.max(barH, total ? 4 : 0), display: 'flex', flexDirection: 'column-reverse', borderRadius: 3, overflow: 'hidden', background: total ? 'transparent' : '#f1f3f7' }}>
+                {types.map(t => {
+                  const v = m.byType?.[t] || 0
+                  if (!v) return null
+                  return <div key={t} style={{ height: `${(v / total) * 100}%`, background: leaveTypeColor(t) }} />
+                })}
+              </div>
+              <div style={{ fontSize: '.6rem', color: '#98a2b3', fontWeight: 700 }}>{m.label.slice(0, 3)}</div>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 10, paddingTop: 10, borderTop: '1px solid #edf0f5' }}>
+        {types.map(t => (
+          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '.68rem', color: '#667085', fontWeight: 700 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: leaveTypeColor(t) }} />{t}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LeaveCalendar({ data, loading, month, onMonthChange, department, departments = [], onDepartmentChange }) {
+  const [selected, setSelected] = useState(null)
+  const days = data?.days || {}
+  const daysInMonth = data?.daysInMonth || 30
+  const firstWeekday = data?.firstWeekday || 0
+  const [y, m] = month.split('-').map(Number)
+  const monthLabel = new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  const maxCount = Math.max(1, ...Object.values(days).map(d => d.count || 0))
+
+  function shift(delta) {
+    let nm = m + delta, ny = y
+    if (nm < 1) { nm = 12; ny -= 1 }
+    if (nm > 12) { nm = 1; ny += 1 }
+    setSelected(null)
+    onMonthChange(`${ny}-${String(nm).padStart(2, '0')}`)
+  }
+
+  const cells = []
+  for (let i = 0; i < firstWeekday; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  const selectedKey = selected ? `${month}-${String(selected).padStart(2, '0')}` : null
+  const selectedPeople = selectedKey ? (days[selectedKey]?.people || []) : null
+
+  return (
+    <LeaveCard
+      title="Leave Calendar"
+      action={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <select value={department || ''} onChange={e => { setSelected(null); onDepartmentChange(e.target.value) }}
+                  style={{ ...INPUT_SM, width: 'auto', padding: '5px 8px' }}>
+            <option value="">All departments</option>
+            {departments.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <button onClick={() => shift(-1)} style={{ ...BTN_SECONDARY, borderRadius: 4, padding: '5px 10px' }}>‹</button>
+          <div style={{ minWidth: 130, textAlign: 'center', fontWeight: 900, color: '#1d2939', fontSize: '.82rem' }}>{monthLabel}</div>
+          <button onClick={() => shift(1)} style={{ ...BTN_SECONDARY, borderRadius: 4, padding: '5px 10px' }}>›</button>
+        </div>
+      }
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {LEAVE_DOW.map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: '.66rem', fontWeight: 900, color: '#98a2b3', padding: '2px 0' }}>{d}</div>
+        ))}
+        {cells.map((d, i) => {
+          if (d == null) return <div key={`b${i}`} />
+          const key = `${month}-${String(d).padStart(2, '0')}`
+          const cell = days[key]
+          const count = cell?.count || 0
+          const intensity = count ? 0.12 + 0.55 * (count / maxCount) : 0
+          const isSel = selected === d
+          return (
+            <button key={key} onClick={() => setSelected(count ? d : null)} disabled={!count}
+                    style={{ border: isSel ? '2px solid #2447d8' : '1px solid #edf0f5', borderRadius: 4, minHeight: 46,
+                             background: count ? `rgba(36,71,216,${intensity})` : '#fff', cursor: count ? 'pointer' : 'default',
+                             padding: 4, textAlign: 'left', fontFamily: 'inherit' }}>
+              <div style={{ fontSize: '.66rem', fontWeight: 800, color: count > maxCount * 0.6 ? '#fff' : '#475467' }}>{d}</div>
+              {count > 0 && (
+                <div style={{ fontSize: '.62rem', fontWeight: 900, color: count > maxCount * 0.6 ? '#fff' : '#2447d8', marginTop: 2 }}>{count}</div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {loading && <div style={{ fontSize: '.72rem', color: '#98a2b3', marginTop: 8 }}>Loading…</div>}
+      {selectedPeople && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #edf0f5' }}>
+          <div style={{ fontSize: '.74rem', fontWeight: 900, color: '#344054', marginBottom: 8 }}>
+            On leave {selectedKey} — {selectedPeople.length} {selectedPeople.length === 1 ? 'person' : 'people'}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {selectedPeople.map((p, i) => (
+              <div key={`${p.employeeCode}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f5f7fb', border: '1px solid #edf0f5', borderRadius: 99, padding: '4px 10px', fontSize: '.7rem' }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: leaveTypeColor(p.leaveType) }} />
+                <span style={{ fontWeight: 800, color: '#101828' }}>{p.name}</span>
+                <span style={{ color: '#98a2b3' }}>· {p.department}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </LeaveCard>
+  )
+}
+
+function LeaveDashboardPanel({ showToast }) {
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [dash, setDash] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+  const [department, setDepartment] = useState('')
+  const [cal, setCal] = useState(null)
+  const [calLoading, setCalLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    apiFetch(`/api/leave/dashboard?year=${year}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('dashboard')))
+      .then(d => { if (alive) setDash(d) })
+      .catch(() => { if (alive) showToast?.('Load leave dashboard failed', 'error') })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [year, showToast])
+
+  useEffect(() => {
+    let alive = true
+    setCalLoading(true)
+    const q = department ? `&department=${encodeURIComponent(department)}` : ''
+    apiFetch(`/api/leave/calendar?month=${month}${q}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('calendar')))
+      .then(d => { if (alive) setCal(d) })
+      .catch(() => {})
+      .finally(() => { if (alive) setCalLoading(false) })
+    return () => { alive = false }
+  }, [month, department])
+
+  const s = dash?.summary || {}
+  const exec = dash?.executive || {}
+  const onToday = dash?.onLeaveToday || []
+  const byDept = dash?.byDepartment || []
+  const maxDeptDays = Math.max(1, ...byDept.map(d => d.totalDays || 0))
+  const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2]
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <section style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ fontWeight: 900, color: '#1d2939', fontSize: '1rem', marginRight: 'auto' }}>Leave Overview {loading ? '' : `· ${year}`}</div>
+        <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ ...INPUT_SM, width: 'auto', padding: '5px 10px' }}>
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12, flexShrink: 0 }}>
+        <MetricCard label="Pending Approval" value={loading ? '—' : s.pendingApproval} note="Manager / HR queue" color="#d97706" />
+        <MetricCard label="On Leave Today" value={loading ? '—' : s.onLeaveToday} note="Daily availability" color={ACE_BLUE} />
+        <MetricCard label="Approved This Month" value={loading ? '—' : s.approvedThisMonth} note="Days this month" color="#16a34a" />
+        <MetricCard label="Total Days YTD" value={loading ? '—' : s.totalDaysYtd} note={`Approved in ${year}`} color="#6d3f8f" />
+        <MetricCard label="Employees On Leave" value={loading ? '—' : s.employeesOnLeaveYtd} note="Distinct, YTD" color={ACE_RED} />
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12 }}>
+        <LeaveCard title={`Monthly Trend · ${year}`}>
+          {dash ? <LeaveMonthlyTrend months={dash.monthlyTrend} /> : <div style={{ fontSize: '.74rem', color: '#98a2b3' }}>Loading…</div>}
+        </LeaveCard>
+        <LeaveCard title={`On Leave Today (${onToday.length})`}>
+          {onToday.length === 0 ? (
+            <div style={{ fontSize: '.74rem', color: '#98a2b3', padding: '12px 0' }}>Nobody is on approved leave today.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 170, overflowY: 'auto' }}>
+              {onToday.map((p, i) => (
+                <div key={`${p.employeeCode}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: leaveTypeColor(p.leaveType), flexShrink: 0 }} />
+                  <span style={{ fontSize: '.74rem', fontWeight: 800, color: '#101828' }}>{p.name}</span>
+                  <span style={{ fontSize: '.7rem', color: '#98a2b3' }}>{p.department}</span>
+                  <span style={{ fontSize: '.68rem', color: '#667085', marginLeft: 'auto', whiteSpace: 'nowrap' }}>{p.leaveType.replace(' Leave', '')} · until {p.endDate.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </LeaveCard>
+      </section>
+
+      <LeaveCalendar
+        data={cal} loading={calLoading} month={month} onMonthChange={setMonth}
+        department={department} departments={cal?.departments || []} onDepartmentChange={setDepartment}
+      />
+
+      <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <LeaveCard title={`By Department · ${year}`}>
+          {byDept.length === 0 ? (
+            <div style={{ fontSize: '.74rem', color: '#98a2b3' }}>No approved leave yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {byDept.map(d => (
+                <div key={d.department}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.72rem', fontWeight: 800, color: '#344054', marginBottom: 3 }}>
+                    <span>{d.department} <span style={{ color: '#98a2b3', fontWeight: 600 }}>· {d.employees} ppl</span></span>
+                    <span>{d.totalDays} d</span>
+                  </div>
+                  <div style={{ height: 7, background: '#f1f3f7', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ width: `${(d.totalDays / maxDeptDays) * 100}%`, height: '100%', background: ACE_BLUE, borderRadius: 99 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </LeaveCard>
+
+        <LeaveCard title="Executive Summary">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+            {[
+              ['Total leave days', exec.totalDays ?? '—'],
+              ['Total requests', exec.totalRequests ?? '—'],
+              ['Approval rate', exec.approvalRate != null ? `${exec.approvalRate}%` : '—'],
+              ['Most used type', (exec.mostUsedType || '—').replace(' Leave', '')],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: '#f5f7fb', border: '1px solid #edf0f5', borderRadius: 4, padding: '9px 11px' }}>
+                <div style={{ fontSize: '.66rem', color: '#667085', fontWeight: 700 }}>{k}</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1d2939', marginTop: 2 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#344054', marginBottom: 6 }}>Top leave takers</div>
+          {(exec.topTakers || []).length === 0 ? (
+            <div style={{ fontSize: '.72rem', color: '#98a2b3' }}>No data.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {exec.topTakers.map((t, i) => (
+                <div key={t.employeeCode} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.72rem' }}>
+                  <span style={{ width: 18, color: '#98a2b3', fontWeight: 800 }}>{i + 1}.</span>
+                  <span style={{ fontWeight: 800, color: '#101828' }}>{t.name}</span>
+                  <span style={{ color: '#98a2b3' }}>{t.department}</span>
+                  <span style={{ marginLeft: 'auto', fontWeight: 900, color: ACE_BLUE }}>{t.days} d</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </LeaveCard>
+      </section>
+    </div>
+  )
+}
+
 // ─── Org Chart Page ───────────────────────────────────────────────────────────
 function OrgChartPage({ onOpenEmployee }) {
   const [view, setView] = useState('dept')
@@ -4599,12 +4872,17 @@ function HRModulePage({ moduleId, employees = [], label, showToast }) {
         <button style={{ ...BTN_PRIMARY, borderRadius: 4 }}>{queue.action}</button>
       </section>
 
+      {moduleId === 'leave' && <LeaveDashboardPanel showToast={showToast} />}
+
+      {moduleId !== 'leave' && (
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, flexShrink: 0 }}>
         {module.metrics.map(([metricLabel, value, note, color]) => (
           <MetricCard key={metricLabel} label={metricLabel} value={value} note={note} color={color || ACE_BLUE} />
         ))}
       </section>
+      )}
 
+      {moduleId !== 'leave' && (
       <section style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1fr', gap: 12 }}>
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: 16 }}>
           <div style={{ fontSize: '.82rem', fontWeight: 900, color: '#344054', marginBottom: 12 }}>Module Workspaces</div>
@@ -4627,9 +4905,11 @@ function HRModulePage({ moduleId, employees = [], label, showToast }) {
         <HRDistributionPanel title="Employee Status" rows={statusRows} color="#16a34a" />
         <HRDistributionPanel title="Department Coverage" rows={deptRows} color={ACE_BLUE} />
       </section>
+      )}
 
       {moduleId === 'leave' && <LeavePolicyPanel showToast={showToast} />}
 
+      {moduleId !== 'leave' && (
       <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #edf0f5', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ fontWeight: 900, color: '#1d2939' }}>{queue.title}</div>
@@ -4658,6 +4938,7 @@ function HRModulePage({ moduleId, employees = [], label, showToast }) {
           </table>
         </div>
       </section>
+      )}
     </main>
   )
 }

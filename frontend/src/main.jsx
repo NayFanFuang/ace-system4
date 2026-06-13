@@ -21,6 +21,8 @@ import HWPOImportPage from '../HWPOImportPage.jsx'
 import RFMonitorPage from '../RFMonitorPage.jsx'
 import PreSiteMonitorPage from '../PreSiteMonitorPage.jsx'
 import PreSiteMonitorDtaPage from '../PreSiteMonitorDtaPage.jsx'
+import DtaUpdatePage from '../DtaUpdatePage.jsx'
+import DtaBillingPage from '../DtaBillingPage.jsx'
 import ReportUploadPage from '../ReportUploadPage.jsx'
 import DtePaymentsPage from '../DtePaymentsPage.jsx'
 import BillReaderPage from '../BillReaderPage.jsx'
@@ -75,6 +77,8 @@ const COMPONENTS = {
   RFMonitorPage,
   PreSiteMonitorPage,
   PreSiteMonitorDtaPage,
+  DtaUpdatePage,
+  DtaBillingPage,
   HREmployeePage,
   IntegrationMonitorPage,
   KPIPage,

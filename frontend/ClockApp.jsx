@@ -1265,6 +1265,7 @@ function SummaryView({ photo, data, onClose, onNotify }) {
 const LEAVE_STATUS_STYLE = {
   PENDING:   { bg: '#fff8e1', color: '#f59e0b', label: 'Pending PM' },
   PENDING_PM: { bg: '#fff8e1', color: '#f59e0b', label: 'Pending PM' },
+  PENDING_SPM: { bg: '#fff4d6', color: '#d97706', label: 'Pending Senior PM' },
   PENDING_DC: { bg: '#fff3e0', color: '#ea8a00', label: 'Pending PD' },
   PENDING_HR: { bg: '#e8f0fe', color: '#2447d8', label: 'Pending HR' },
   APPROVED:  { bg: '#e8f5e9', color: '#16a34a', label: 'Approved' },
@@ -1286,7 +1287,7 @@ function leaveCategory(type = '') {
   return 'Other Leave'
 }
 
-function leaveFlowSteps(leaveType) {
+function leaveFlowSteps(leaveType, hasSpm = false) {
   const category = leaveCategory(leaveType)
   if (category === 'Sick Leave') return [
     { key: 'SUBMIT', label: 'Submit' },
@@ -1302,14 +1303,15 @@ function leaveFlowSteps(leaveType) {
   return [
     { key: 'SUBMIT', label: 'Submit' },
     { key: 'PM', label: 'PM' },
+    ...(hasSpm ? [{ key: 'SPM', label: 'Senior PM' }] : []),
     { key: 'PD', label: 'PD / Head' },
     { key: 'APPROVED', label: 'Approved' },
     { key: 'ACK', label: 'HR + Boss' },
   ]
 }
 
-function flowStepState(leaveType, status = 'DRAFT', rejectAtStep = '') {
-  const steps = leaveFlowSteps(leaveType)
+function flowStepState(leaveType, status = 'DRAFT', rejectAtStep = '', hasSpm = false) {
+  const steps = leaveFlowSteps(leaveType, hasSpm)
   const rejectedKey = rejectAtStep === 'DC' ? 'PD' : rejectAtStep
   return steps.map(step => {
     if (status === 'DRAFT') return { ...step, state: step.key === 'SUBMIT' ? 'current' : 'todo' }
@@ -1319,14 +1321,18 @@ function flowStepState(leaveType, status = 'DRAFT', rejectAtStep = '') {
       const stepIndex = steps.findIndex(s => s.key === step.key)
       return { ...step, state: rejectIndex >= 0 && stepIndex < rejectIndex ? 'done' : 'todo' }
     }
-    if (step.key === 'ACK' && ['PENDING', 'PENDING_PM', 'PENDING_DC', 'APPROVED'].includes(status)) {
+    if (step.key === 'ACK' && ['PENDING', 'PENDING_PM', 'PENDING_SPM', 'PENDING_DC', 'APPROVED'].includes(status)) {
       return { ...step, state: 'done' }
     }
     if (step.key === 'SUBMIT') return { ...step, state: 'done' }
     if (status === 'PENDING_HR') return { ...step, state: step.key === 'HR' ? 'current' : 'todo' }
     if (status === 'PENDING_PM' || status === 'PENDING') return { ...step, state: step.key === 'PM' ? 'current' : 'todo' }
-    if (status === 'PENDING_DC') {
+    if (status === 'PENDING_SPM') {
       if (step.key === 'PM') return { ...step, state: 'done' }
+      return { ...step, state: step.key === 'SPM' ? 'current' : 'todo' }
+    }
+    if (status === 'PENDING_DC') {
+      if (step.key === 'PM' || step.key === 'SPM') return { ...step, state: 'done' }
       return { ...step, state: step.key === 'PD' ? 'current' : 'todo' }
     }
     if (status === 'APPROVED') return { ...step, state: 'done' }
@@ -1335,14 +1341,14 @@ function flowStepState(leaveType, status = 'DRAFT', rejectAtStep = '') {
   })
 }
 
-function LeaveFlowDiagram({ leaveType, status = 'DRAFT', rejectAtStep = '' }) {
+function LeaveFlowDiagram({ leaveType, status = 'DRAFT', rejectAtStep = '', hasSpm = false }) {
   const stateStyle = {
     done: { bg: '#dcfce7', color: '#166534', border: '#86efac', label: 'Done' },
     current: { bg: '#dbeafe', color: '#1d4ed8', border: '#93c5fd', label: 'Now' },
     rejected: { bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5', label: 'Rejected' },
     todo: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Pending' },
   }
-  const steps = flowStepState(leaveType, status, rejectAtStep)
+  const steps = flowStepState(leaveType, status, rejectAtStep, hasSpm)
   return (
     <div className="flex items-stretch gap-1.5 overflow-x-auto pb-1">
       {steps.map((step, idx) => {
@@ -1397,6 +1403,7 @@ function ApprovalsTab({ user, highlightId, onCountChange }) {
 
   function stepForStatus(status) {
     if (status === 'PENDING_PM') return 'pm-approve'
+    if (status === 'PENDING_SPM') return 'spm-approve'
     if (status === 'PENDING_DC') return 'pd-approve'
     if (status === 'PENDING_HR') return 'hr-acknowledge'
     return null
@@ -1480,7 +1487,7 @@ function ApprovalsTab({ user, highlightId, onCountChange }) {
                   <div className="text-xs text-gray-600 font-semibold mb-1">{lv.leaveType} · {lv.sessionType}</div>
                   <div className="text-xs text-gray-500">{lv.startDate}{lv.endDate !== lv.startDate ? ` → ${lv.endDate}` : ''} · {lv.days} day(s)</div>
                   {lv.reason && <div className="text-xs text-gray-400 mt-1 italic">"{lv.reason}"</div>}
-                  <div className="mt-2"><LeaveFlowDiagram leaveType={lv.leaveType} status={lv.status} /></div>
+                  <div className="mt-2"><LeaveFlowDiagram leaveType={lv.leaveType} status={lv.status} hasSpm={lv.status === 'PENDING_SPM' || !!lv.spmApprovedBy} /></div>
 
                   {rejectFor === lv.id ? (
                     <div className="mt-2 flex flex-col gap-1.5">
@@ -1585,7 +1592,7 @@ function LeaveTab({ user }) {
     .filter(lv => lv.status === 'APPROVED')
     .reduce((sum, lv) => sum + Number(lv.days || 0), 0)
   const pendingUsed = categoryLeaves
-    .filter(lv => ['PENDING', 'PENDING_PM', 'PENDING_DC', 'PENDING_HR'].includes(lv.status))
+    .filter(lv => ['PENDING', 'PENDING_PM', 'PENDING_SPM', 'PENDING_DC', 'PENDING_HR'].includes(lv.status))
     .reduce((sum, lv) => sum + Number(lv.days || 0), 0)
   const remainingAfterRequest = selectedEntitlement == null ? null : selectedEntitlement - approvedUsed - pendingUsed - days
   const entitlementText = selectedEntitlement == null ? 'Policy-based' : `${selectedEntitlement.toFixed(1)} day(s)`
@@ -1798,9 +1805,9 @@ function LeaveTab({ user }) {
                     <div className="text-xs text-gray-400 mt-0.5">Reviewed by {lv.reviewedBy}</div>
                   )}
                   <div className="mt-2">
-                    <LeaveFlowDiagram leaveType={lv.leaveType} status={lv.status} rejectAtStep={lv.rejectAtStep} />
+                    <LeaveFlowDiagram leaveType={lv.leaveType} status={lv.status} rejectAtStep={lv.rejectAtStep} hasSpm={lv.status === 'PENDING_SPM' || !!lv.spmApprovedBy} />
                   </div>
-                  {['PENDING', 'PENDING_PM', 'PENDING_DC', 'PENDING_HR'].includes(lv.status) && (
+                  {['PENDING', 'PENDING_PM', 'PENDING_SPM', 'PENDING_DC', 'PENDING_HR'].includes(lv.status) && (
                     <button
                       onClick={() => handleCancel(lv.id)}
                       className="mt-2 text-xs font-bold px-3 py-1 rounded-lg border-none cursor-pointer"

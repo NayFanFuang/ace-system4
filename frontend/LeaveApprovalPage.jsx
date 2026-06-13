@@ -1,9 +1,10 @@
 import { useEffect, useState, Fragment } from 'react'
 
-const STEP_LABELS = { pm: 'PM (Project Manager)', pd: 'PD (Project Director)', hr: 'HR Acknowledgement' }
+const STEP_LABELS = { pm: 'PM (Project Manager)', spm: 'Senior PM', pd: 'PD (Project Director)', hr: 'HR Acknowledgement' }
 
 const STATUS_STYLE = {
   PENDING_PM: { bg: '#fff8e1', color: '#b45309', label: 'Awaiting PM' },
+  PENDING_SPM: { bg: '#fff4d6', color: '#a16207', label: 'Awaiting Senior PM' },
   PENDING_DC: { bg: '#fff3e0', color: '#c2410c', label: 'Awaiting PD' },
   PENDING_HR: { bg: '#e8f0fe', color: '#1d4ed8', label: 'Awaiting HR' },
   APPROVED:   { bg: '#e8f5e9', color: '#16a34a', label: 'Approved' },
@@ -25,15 +26,16 @@ function leaveCategory(t = '') {
   return 'Other'
 }
 
-function flowSteps(leaveType) {
+function flowSteps(leaveType, hasSpm = false) {
   const cat = leaveCategory(leaveType)
   if (cat === 'Sick')     return [['SUBMIT','Submit'],['HR','HR Ack.'],['APPROVED','Approved']]
   if (cat === 'Personal') return [['SUBMIT','Submit'],['PM','PM'],['APPROVED','Approved'],['ACK','HR + Boss']]
-  return [['SUBMIT','Submit'],['PM','PM'],['PD','PD / Head'],['APPROVED','Approved'],['ACK','HR + Boss']]
+  return [['SUBMIT','Submit'],['PM','PM'],...(hasSpm ? [['SPM','Senior PM']] : []),['PD','PD / Head'],['APPROVED','Approved'],['ACK','HR + Boss']]
 }
 
 function flowState(leave) {
-  const steps = flowSteps(leave.leaveType)
+  const hasSpm = leave.status === 'PENDING_SPM' || !!leave.spmApprovedBy
+  const steps = flowSteps(leave.leaveType, hasSpm)
   const rejectKey = (leave.rejectAtStep || '').replace('DC', 'PD')
   return steps.map(([k, label]) => {
     let state = 'todo'
@@ -43,12 +45,16 @@ function flowState(leave) {
       if (k === rejectKey) state = 'rejected'
       else if (ri >= 0 && si < ri) state = 'done'
     } else if (k === 'SUBMIT') state = 'done'
-    else if (k === 'ACK' && ['PENDING_PM','PENDING_DC','APPROVED'].includes(leave.status)) state = 'done'
+    else if (k === 'ACK' && ['PENDING_PM','PENDING_SPM','PENDING_DC','APPROVED'].includes(leave.status)) state = 'done'
     else if (leave.status === 'APPROVED') state = 'done'
     else if (leave.status === 'PENDING_HR') state = k === 'HR' ? 'current' : 'todo'
     else if (leave.status === 'PENDING_PM' || leave.status === 'PENDING') state = k === 'PM' ? 'current' : 'todo'
-    else if (leave.status === 'PENDING_DC') {
+    else if (leave.status === 'PENDING_SPM') {
       if (k === 'PM') state = 'done'
+      else if (k === 'SPM') state = 'current'
+    }
+    else if (leave.status === 'PENDING_DC') {
+      if (k === 'PM' || k === 'SPM') state = 'done'
       else if (k === 'PD') state = 'current'
     }
     return { key: k, label, state }

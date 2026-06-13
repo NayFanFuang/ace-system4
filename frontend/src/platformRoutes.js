@@ -144,6 +144,12 @@ export const ROUTE_DEFINITIONS = {
     roles: ROLES.FINANCE,
     component: 'BillReaderPage',
   },
+  '/finance/dta-billing': {
+    title: 'DTA Billing (PAC)',
+    group: 'Finance',
+    roles: ROLES.FINANCE,
+    component: 'DtaBillingPage',
+  },
   '/project/rf-monitor': {
     title: 'RF Monitor — HWT2304',
     group: 'Project',
@@ -161,6 +167,12 @@ export const ROUTE_DEFINITIONS = {
     group: 'Project',
     roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'PROJECT_ADMIN', 'PM', 'DIRECTOR', 'HR_ADMIN', 'EMPLOYEE'],
     component: 'PreSiteMonitorDtaPage',
+  },
+  '/project/presite-monitor-dta/update': {
+    title: 'DTA — Update My Progress',
+    group: 'Project',
+    roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'PROJECT_ADMIN', 'PM', 'DIRECTOR', 'HR_ADMIN', 'EMPLOYEE'],
+    component: 'DtaUpdatePage',
   },
   '/project/report-upload': {
     title: 'Report Upload (DTE)',

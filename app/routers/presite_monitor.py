@@ -2129,12 +2129,20 @@ async def dta_assign(
             c.owner_source = "MANUAL"
             c.assigned_at = now
             c.assigned_by = actor
-            # best-effort: link the assignee to a login so /dta/my-clusters can scope by code
-            c.assigned_employee_code = (await db.execute(
+            # link the assignee to a login so /dta/my-clusters can scope by code.
+            # Strip the team-code prefix (TH_/KH_/PH_…) and match first_name OR full name on an
+            # ACTIVE account — unambiguous only (mirrors the ETL owner backfill).
+            stripped = re.sub(r"^[A-Z]{2}_", "", name)
+            matches = (await db.execute(
                 select(AuthUser.employee_code).where(
-                    func.lower(func.concat(AuthUser.first_name, " ", AuthUser.last_name)) == name.lower()
-                ).limit(1)
-            )).scalar_one_or_none()
+                    AuthUser.is_active == True,  # noqa: E712
+                    or_(
+                        func.lower(AuthUser.first_name) == stripped.lower(),
+                        func.lower(func.concat(AuthUser.first_name, " ", AuthUser.last_name)) == stripped.lower(),
+                    ),
+                )
+            )).scalars().all()
+            c.assigned_employee_code = matches[0] if len(set(matches)) == 1 else None
         updated.append(item.cluster)
 
     await db.commit()

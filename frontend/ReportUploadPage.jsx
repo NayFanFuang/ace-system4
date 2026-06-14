@@ -82,7 +82,9 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
   const [sites, setSites] = useState([])
   const [monthly, setMonthly] = useState([])
   const [weekly, setWeekly] = useState([])
-  const [incomeView, setIncomeView] = useState('month')  // 'month' | 'week'
+  const [byCycle, setByCycle] = useState([])
+  const [currentCycle, setCurrentCycle] = useState(null)
+  const [incomeView, setIncomeView] = useState('cycle')  // 'cycle' | 'month' | 'week'
   const [tab, setTab] = useState('summary')              // 'summary' | 'upload'
   const [loading, setLoading] = useState(true)
   const [me, setMe] = useState('')
@@ -96,11 +98,14 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
       setSites(data.data || [])
       setMonthly(data.monthly || [])
       setWeekly(data.weekly || [])
+      setByCycle(data.by_cycle || [])
+      setCurrentCycle(data.current_cycle || null)
       setMe(data.employee_code || authenticatedUser?.employeeCode || '')
     } catch {
       setSites([])
       setMonthly([])
       setWeekly([])
+      setByCycle([])
     } finally {
       setLoading(false)
     }
@@ -124,10 +129,11 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
   const paidRevenue = monthly.reduce((a, m) => a + (m.paid || 0), 0)
   const unpaidRevenue = monthly.reduce((a, m) => a + (m.unpaid || 0), 0)
 
-  // Income breakdown view (month | week)
-  const incomeRows = incomeView === 'week' ? weekly : monthly
-  const labelKey = incomeView === 'week' ? 'week' : 'month'
-  const labelFn = incomeView === 'week' ? weekLabel : monthLabel
+  // Income breakdown view (cycle | month | week)
+  const incomeRows = incomeView === 'week' ? weekly : incomeView === 'cycle' ? byCycle : monthly
+  const labelKey = incomeView === 'week' ? 'week' : incomeView === 'cycle' ? 'cycle' : 'month'
+  const labelFn = incomeView === 'week' ? weekLabel
+    : incomeView === 'cycle' ? (c => c) : monthLabel
 
   // Upload tab: only sites that are DT done (actionable)
   const uploadSites = sites.filter(s => s.dt_done)
@@ -212,17 +218,22 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
                       <CalendarDays size={18} style={{ color: PURPLE }} /> Income Breakdown
                     </h3>
                     <div className="inline-flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-                      {[['month', 'Month'], ['week', 'Week']].map(([v, l]) => (
+                      {[['cycle', 'Round'], ['month', 'Month'], ['week', 'Week']].map(([v, l]) => (
                         <button key={v} onClick={() => setIncomeView(v)}
                           className={`rounded-md px-3 py-1 text-xs font-black transition ${incomeView === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>{l}</button>
                       ))}
                     </div>
                   </div>
+                  {incomeView === 'cycle' && currentCycle?.cycle && (
+                    <div className="border-b border-slate-100 bg-blue-50/40 px-6 py-2 text-[.7rem] font-bold text-slate-500">
+                      Pay rounds: <b>R1</b> = work approved 1–15 (pay 15th) · <b>R2</b> = approved 16–end (pay month-end). Current: <b className="text-slate-700">{currentCycle.cycle}</b> · next pay {currentCycle.pay_date}
+                    </div>
+                  )}
                   <div className="overflow-x-auto">
                     <table className="w-full" style={{ fontSize: '.82rem' }}>
                       <thead>
                         <tr className="bg-slate-50 text-left text-[.62rem] font-black uppercase tracking-wide text-slate-500">
-                          <th className="px-6 py-3">{incomeView === 'week' ? 'Week' : 'Month'}</th>
+                          <th className="px-6 py-3">{incomeView === 'week' ? 'Week' : incomeView === 'cycle' ? 'Round' : 'Month'}</th>
                           <th className="px-6 py-3 text-center">Sites</th>
                           <th className="px-6 py-3 text-center">Uploaded</th>
                           <th className="px-6 py-3 text-right">Total</th>
@@ -233,12 +244,14 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
                       <tbody>
                         {incomeRows.map(r => {
                           const key = r[labelKey]
-                          const isCurrent = incomeView === 'month' && key === thisMonth
+                          const isCurrent = (incomeView === 'month' && key === thisMonth)
+                            || (incomeView === 'cycle' && key === currentCycle?.cycle)
                           return (
                             <tr key={key} className={`border-t border-slate-100 ${isCurrent ? 'bg-emerald-50/50' : ''}`}>
                               <td className="px-6 py-3 font-black text-slate-900">
                                 {labelFn(key)}
-                                {isCurrent && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[.55rem] font-black text-emerald-700">THIS MONTH</span>}
+                                {incomeView === 'cycle' && r.pay_date && <span className="ml-2 text-[.58rem] font-bold text-slate-400">pay {r.pay_date}</span>}
+                                {isCurrent && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[.55rem] font-black text-emerald-700">CURRENT</span>}
                               </td>
                               <td className="px-6 py-3 text-center font-bold text-slate-700">{r.sites}</td>
                               <td className="px-6 py-3 text-center font-bold text-blue-700">{r.uploaded}</td>
@@ -251,7 +264,7 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
                       </tbody>
                       <tfoot>
                         <tr className="border-t-2 border-slate-200 bg-slate-50">
-                          <td className="px-6 py-3 font-black text-slate-900">Total ({incomeRows.length} {incomeView === 'week' ? 'weeks' : 'months'})</td>
+                          <td className="px-6 py-3 font-black text-slate-900">Total ({incomeRows.length} {incomeView === 'week' ? 'weeks' : incomeView === 'cycle' ? 'rounds' : 'months'})</td>
                           <td className="px-6 py-3 text-center font-black text-slate-700">{incomeRows.reduce((a,r)=>a+r.sites,0)}</td>
                           <td className="px-6 py-3 text-center font-black text-blue-700">{incomeRows.reduce((a,r)=>a+r.uploaded,0)}</td>
                           <td className="px-6 py-3 text-right font-mono font-black text-slate-900">{fmtBaht(totalRevenue)}</td>
@@ -290,6 +303,7 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
                           <th className="px-6 py-3">DT Date</th>
                           <th className="px-6 py-3">Stage</th>
                           <th className="px-6 py-3">Approved</th>
+                          <th className="px-6 py-3">Pay Round</th>
                           <th className="px-6 py-3">Report</th>
                           <th className="px-6 py-3 text-center">Payment</th>
                           <th className="px-6 py-3 text-right">Income</th>
@@ -324,6 +338,11 @@ export default function ReportUploadPage({ authenticatedUser, onLogout }) {
                                     {s.approved_by_name && <div className="text-[.58rem] font-bold text-slate-400">by {s.approved_by_name}</div>}
                                   </div>
                                 ) : <span className="text-xs font-bold text-slate-300">—</span>}
+                              </td>
+                              <td className="px-6 py-4">
+                                {s.cycle
+                                  ? <div><div className="font-mono text-[.66rem] font-black text-slate-700">{s.cycle}</div><div className="text-[.56rem] font-bold text-slate-400">pay {s.pay_date}</div></div>
+                                  : <span className="text-xs font-bold text-slate-300">—</span>}
                               </td>
                               <td className="px-6 py-4">
                                 {s.has_report

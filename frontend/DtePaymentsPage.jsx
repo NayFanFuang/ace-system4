@@ -46,10 +46,13 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
   const [rows, setRows] = useState([])
   const [byDte, setByDte] = useState([])
   const [monthly, setMonthly] = useState([])
+  const [byCycle, setByCycle] = useState([])
+  const [currentCycle, setCurrentCycle] = useState(null)
   const [totals, setTotals] = useState({})
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')  // all | paid | unpaid
   const [monthFilter, setMonthFilter] = useState('')
+  const [cycleFilter, setCycleFilter] = useState('')
   const [dteFilter, setDteFilter] = useState('')
   const [busyId, setBusyId] = useState(null)
 
@@ -59,19 +62,22 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
       const params = new URLSearchParams()
       if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
       if (monthFilter) params.set('month', monthFilter)
+      if (cycleFilter) params.set('cycle', cycleFilter)
       if (dteFilter) params.set('dte_code', dteFilter)
       const res = await apiFetch(`/api/presite/finance/payments?${params.toString()}`)
       const d = await res.json()
       setRows(d.data || [])
       setByDte(d.by_dte || [])
       setMonthly(d.monthly || [])
+      setByCycle(d.by_cycle || [])
+      setCurrentCycle(d.current_cycle || null)
       setTotals(d.totals || {})
     } catch {
-      setRows([]); setByDte([]); setMonthly([]); setTotals({})
+      setRows([]); setByDte([]); setMonthly([]); setByCycle([]); setTotals({})
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, monthFilter, dteFilter])
+  }, [statusFilter, monthFilter, cycleFilter, dteFilter])
 
   useEffect(() => { reload() }, [reload])
 
@@ -100,6 +106,23 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
     } finally { setBusyId(null) }
   }
 
+  // Batch-pay every payable site in one cycle (Round 1 / Round 2)
+  async function payWholeCycle(cycle, payableAmount) {
+    if (!cycle) return
+    const ref = window.prompt(`Pay ALL ready sites in cycle ${cycle} (${fmtBaht(payableAmount)}).\nPayment reference (optional):`, cycle)
+    if (ref === null) return
+    setBusyId(`cycle:${cycle}`)
+    try {
+      const res = await apiFetch('/api/presite/finance/pay-cycle', {
+        method: 'POST', body: JSON.stringify({ cycle, payment_ref: ref || null, dte_code: dteFilter || null }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(d.detail || 'Failed'); return }
+      alert(`Paid ${d.paid_count} site(s) · ${fmtBaht(d.total)}${d.skipped ? ` · ${d.skipped} skipped (not ready)` : ''}`)
+      await reload()
+    } finally { setBusyId(null) }
+  }
+
   const name = authenticatedUser?.name || ''
 
   // Export Excel (current filters) — fetch with auth → blob download
@@ -107,6 +130,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
     const params = new URLSearchParams()
     if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
     if (monthFilter) params.set('month', monthFilter)
+    if (cycleFilter) params.set('cycle', cycleFilter)
     if (dteFilter) params.set('dte_code', dteFilter)
     try {
       const res = await apiFetch(`/api/presite/finance/payments/export?${params.toString()}`)
@@ -241,6 +265,48 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
             <StatCard label="DTEs" value={totals.dtes || 0} helper="With records" tone={PURPLE} icon={Users} />
           </section>
 
+          {/* Pay cycles — Round 1 (1–15) / Round 2 (16–EOM), by approval date */}
+          {byCycle.length > 0 && (
+            <Card className="overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <h3 className="inline-flex items-center gap-2 text-base font-black text-slate-950"><Clock size={18} style={{ color: ACE_BLUE }} /> Pay Cycles</h3>
+                {currentCycle?.cycle && <span className="text-[.66rem] font-bold text-slate-400">Current: <b className="text-slate-600">{currentCycle.cycle}</b> · next pay {currentCycle.pay_date}</span>}
+              </div>
+              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                {byCycle.map(c => {
+                  const active = cycleFilter === c.cycle
+                  const busy = busyId === `cycle:${c.cycle}`
+                  return (
+                    <div key={c.cycle} className={`rounded-xl border p-4 ${active ? 'border-blue-400 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex items-center justify-between">
+                        <button onClick={() => setCycleFilter(active ? '' : c.cycle)} className="text-left">
+                          <div className="font-mono text-sm font-black text-slate-900">{c.cycle}</div>
+                          <div className="text-[.6rem] font-bold text-slate-400">pay {c.pay_date} · {c.sites} site(s)</div>
+                        </button>
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[.58rem] font-black text-slate-500">{active ? 'FILTERED' : 'filter'}</span>
+                      </div>
+                      <div className="mt-3 flex items-end justify-between">
+                        <div>
+                          <div className="text-[.58rem] font-bold uppercase text-slate-400">Ready to pay</div>
+                          <div className="font-mono text-lg font-black" style={{ color: c.payable > 0 ? RED : '#94a3b8' }}>{fmtBaht(c.payable)}</div>
+                        </div>
+                        <button disabled={busy || c.payable <= 0} onClick={() => payWholeCycle(c.cycle, c.payable)}
+                          title={c.payable <= 0 ? 'Nothing ready to pay in this cycle' : `Pay all ready sites in ${c.cycle}`}
+                          className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: GREEN }}>
+                          {busy ? '…' : 'Pay cycle'}
+                        </button>
+                      </div>
+                      <div className="mt-2 flex gap-3 text-[.58rem] font-bold text-slate-400">
+                        <span className="text-emerald-600">paid {fmtBaht(c.paid)}</span>
+                        <span className="text-amber-600">unpaid {fmtBaht(c.unpaid)}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          )}
+
           {/* Charts */}
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* Monthly stacked bars */}
@@ -346,6 +412,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                       <th className="px-4 py-3">Type / Rate</th>
                       <th className="px-4 py-3">DT Date</th>
                       <th className="px-4 py-3">Approved</th>
+                      <th className="px-4 py-3">Cycle</th>
                       <th className="px-4 py-3">Report</th>
                       <th className="px-4 py-3 text-right">Income</th>
                       <th className="px-4 py-3 text-center">Status</th>
@@ -371,6 +438,11 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                           <td className="px-4 py-3">
                             {r.approved_at
                               ? <div><div className="text-xs font-bold text-emerald-700">{(r.approved_at||'').slice(0,10)}</div><div className="text-[.56rem] font-bold text-slate-400">{r.approved_by_name}</div></div>
+                              : <span className="text-xs font-bold text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            {r.cycle
+                              ? <div><div className="font-mono text-[.66rem] font-black text-slate-700">{r.cycle}</div><div className="text-[.56rem] font-bold text-slate-400">pay {r.pay_date}</div></div>
                               : <span className="text-xs font-bold text-slate-300">—</span>}
                           </td>
                           <td className="px-4 py-3">

@@ -7,6 +7,7 @@ State machine:
 """
 
 import asyncio
+import calendar
 import os
 import re as _re_path
 from datetime import datetime, timezone, timedelta
@@ -1252,6 +1253,40 @@ def _safe_filename(name: str) -> str:
     return base[:200] or "report.rar"
 
 
+# ── DTE pay cycles ───────────────────────────────────────────────────────────
+# Two payout rounds per month, keyed off the ACE-approval date:
+#   Round 1 = approved on days 1–15  → paid on the 15th
+#   Round 2 = approved on days 16–EOM → paid on the last day of the month
+# Cycle is derived (no stored column) so it stays stable per row.
+def _cycle_for(d) -> tuple[str | None, str | None]:
+    """(cycle_key, pay_date_iso) for a date/datetime, or (None, None)."""
+    if not d:
+        return None, None
+    dd = d.date() if hasattr(d, "date") else d
+    ym = f"{dd.year:04d}-{dd.month:02d}"
+    if dd.day <= 15:
+        return f"{ym}-R1", f"{ym}-15"
+    last = calendar.monthrange(dd.year, dd.month)[1]
+    return f"{ym}-R2", f"{ym}-{last:02d}"
+
+
+def _cycle_pay_date(cycle: str | None) -> str | None:
+    """Pay date for a cycle key like '2026-06-R2'."""
+    if not cycle or "-R" not in cycle:
+        return None
+    ym, _, rnd = cycle.rpartition("-")
+    y, m = ym.split("-")
+    if rnd == "R1":
+        return f"{ym}-15"
+    last = calendar.monthrange(int(y), int(m))[1]
+    return f"{ym}-{last:02d}"
+
+
+def _current_cycle() -> dict:
+    c, p = _cycle_for(datetime.now(timezone.utc))
+    return {"cycle": c, "pay_date": p}
+
+
 @router.get("/my-sites")
 async def my_sites(
     payload: dict = Depends(get_current_user),
@@ -1326,6 +1361,10 @@ async def my_sites(
         d["revenue_month"] = basis.strftime("%Y-%m") if basis else None
         d["revenue_week"] = basis.strftime("%G-W%V") if basis else None  # ISO week e.g. 2026-W22
         d["revenue_date"] = basis.date().isoformat() if basis else None
+        # Pay cycle (from approval date) — which round this income gets paid in
+        cyc, pay_date = _cycle_for(appr_at)
+        d["cycle"] = cyc
+        d["pay_date"] = pay_date
         data.append(d)
 
     # Rollup helper (by month or week key)
@@ -1355,6 +1394,9 @@ async def my_sites(
 
     monthly = _rollup("revenue_month", "month")
     weekly = _rollup("revenue_week", "week")
+    by_cycle = _rollup("cycle", "cycle")
+    for b in by_cycle:
+        b["pay_date"] = _cycle_pay_date(b["cycle"])
 
     return {
         "data": data,
@@ -1362,6 +1404,8 @@ async def my_sites(
         "employee_code": employee_code,
         "monthly": monthly,
         "weekly": weekly,
+        "by_cycle": by_cycle,
+        "current_cycle": _current_cycle(),
         "currency": "THB",
     }
 
@@ -1419,7 +1463,8 @@ async def _compute_income_for_tracking(db: AsyncSession, r: DtePresiteTracking) 
 
 
 async def _finance_payments_data(db: AsyncSession, status: str, month: str | None,
-                                 dte_code: str | None, work_type: str | None) -> dict:
+                                 dte_code: str | None, work_type: str | None,
+                                 cycle: str | None = None) -> dict:
     """Shared builder for finance payment data (used by JSON view + Excel export)."""
     from app.services.dte_rates import compute_income
     from app.models.auth_user import AuthUser
@@ -1489,6 +1534,9 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             disp_site_count = inc["site_count"]
         appr_at = r.ace_approve_at or (r.check_at if r.check_result == "PASS" else None) or r.completed_at
         appr_by = r.ace_approve_by or r.check_by
+        cyc, pay_date = _cycle_for(appr_at)
+        if cycle and cyc != cycle:
+            continue
         data.append({
             "tracking_id": r.id,
             "site_code": r.cluster_key or r.site_code,
@@ -1503,6 +1551,8 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             "current_stage": r.current_stage,
             "dt_done_date": (r.dt_done_at.date().isoformat() if r.dt_done_at else None),
             "month": ym,
+            "cycle": cyc,
+            "pay_date": pay_date,
             "approved": r.current_stage == STAGE_ACE_APPROVED,
             "approved_at": _iso(appr_at) if appr_at else None,
             "approved_by_name": name_by_code.get(appr_by, appr_by) if appr_by else None,
@@ -1558,6 +1608,25 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             b["unpaid"] += d["income"]
     monthly = sorted(months.values(), key=lambda x: x["month"])
 
+    # Pay-cycle rollup (Round 1 / Round 2 per month) — drives the batch-pay UI
+    cycles: dict[str, dict] = {}
+    for d in data:
+        ck = d.get("cycle")
+        if not ck:
+            continue
+        b = cycles.setdefault(ck, {"cycle": ck, "pay_date": d.get("pay_date"),
+                                   "sites": 0, "total": 0.0, "paid": 0.0,
+                                   "unpaid": 0.0, "payable": 0.0})
+        b["sites"] += 1
+        b["total"] += d["income"]
+        if d["paid"]:
+            b["paid"] += d["income"]
+        else:
+            b["unpaid"] += d["income"]
+        if d["payable"]:
+            b["payable"] += d["income"]
+    by_cycle = sorted(cycles.values(), key=lambda x: x["cycle"], reverse=True)
+
     totals = {
         "sites": len(data),
         "dtes": len(by_dte),
@@ -1566,7 +1635,9 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
         "unpaid": sum(d["income"] for d in data if not d["paid"]),
         "payable": sum(d["income"] for d in data if d["payable"]),
     }
-    return {"data": data, "by_dte": by_dte_list, "monthly": monthly, "totals": totals, "currency": "THB"}
+    return {"data": data, "by_dte": by_dte_list, "monthly": monthly,
+            "by_cycle": by_cycle, "current_cycle": _current_cycle(),
+            "totals": totals, "currency": "THB"}
 
 
 @router.get("/finance/payments")
@@ -1575,13 +1646,14 @@ async def finance_payments(
     month: str | None = Query(None),
     dte_code: str | None = Query(None),
     work_type: str | None = Query(None),
+    cycle: str | None = Query(None),
     payload: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Finance view of ALL DTE payments — who to pay, how much, with details."""
     if payload.get("role") not in ROLE_FINANCE:
         raise HTTPException(403, "Only Finance/PM/Admin may view payments")
-    return await _finance_payments_data(db, status, month, dte_code, work_type)
+    return await _finance_payments_data(db, status, month, dte_code, work_type, cycle)
 
 
 @router.get("/finance/payments/export")
@@ -1590,6 +1662,7 @@ async def finance_payments_export(
     month: str | None = Query(None),
     dte_code: str | None = Query(None),
     work_type: str | None = Query(None),
+    cycle: str | None = Query(None),
     payload: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1603,7 +1676,7 @@ async def finance_payments_export(
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from fastapi.responses import StreamingResponse
 
-    res = await _finance_payments_data(db, status, month, dte_code, work_type)
+    res = await _finance_payments_data(db, status, month, dte_code, work_type, cycle)
     rows, by_dte, totals = res["data"], res["by_dte"], res["totals"]
 
     wb = openpyxl.Workbook()
@@ -1625,7 +1698,7 @@ async def finance_payments_export(
     ws.title = "Summary"
     ws["A1"] = "DTE Payment Evidence — Summary"
     ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"Filter: status={status} · month={month or 'all'} · dte={dte_code or 'all'} · type={work_type or 'all'}"
+    ws["A2"] = f"Filter: status={status} · month={month or 'all'} · cycle={cycle or 'all'} · dte={dte_code or 'all'} · type={work_type or 'all'}"
     ws["A2"].font = Font(italic=True, size=9, color="64748B")
     head = ["DTE Code", "DTE Name", "Sites", "Total (THB)", "Paid (THB)", "Unpaid (THB)", "Ready to Pay (THB)"]
     ws.append([])
@@ -1649,7 +1722,8 @@ async def finance_payments_export(
     for d in rows:
         by_code.setdefault(d["dte_code"] or "—", []).append(d)
     det_head = ["Site", "Type", "Rate Category", "DT Date", "Approved", "Approved By",
-                "Report", "Income (THB)", "Payment Status", "Paid At", "Payment Ref"]
+                "Pay Cycle", "Pay Date", "Report", "Income (THB)", "Payment Status",
+                "Paid At", "Payment Ref"]
     for code, items in by_code.items():
         name = items[0]["dte_name"] or code
         safe = (str(code)[:28] or "DTE").replace("/", "-").replace("\\", "-").replace("*", "").replace("?", "").replace(":", "").replace("[", "").replace("]", "")
@@ -1664,6 +1738,7 @@ async def finance_payments_export(
             ws2.append([
                 d["site_code"], d["work_type"], d["category"], d["dt_done_date"] or "",
                 (d["approved_at"] or "")[:10], d["approved_by_name"] or "",
+                d.get("cycle") or "", d.get("pay_date") or "",
                 f"v{d['report_version']}" if d["has_report"] else "—",
                 d["income"],
                 "PAID" if d["paid"] else ("READY" if d["payable"] else "UNPAID"),
@@ -1672,12 +1747,12 @@ async def finance_payments_export(
             tot += d["income"]
             if d["paid"]:
                 paid += d["income"]
-        ws2.append(["", "", "", "", "", "", "TOTAL", tot, "", "", ""])
-        ws2.append(["", "", "", "", "", "", "PAID", paid, "", "", ""])
-        ws2.append(["", "", "", "", "", "", "UNPAID", tot - paid, "", "", ""])
+        ws2.append(["", "", "", "", "", "", "", "", "TOTAL", tot, "", "", ""])
+        ws2.append(["", "", "", "", "", "", "", "", "PAID", paid, "", "", ""])
+        ws2.append(["", "", "", "", "", "", "", "", "UNPAID", tot - paid, "", "", ""])
         for r in range(4, ws2.max_row + 1):
-            ws2.cell(row=r, column=8).number_format = money
-        for i, w in enumerate([16, 7, 22, 12, 12, 16, 8, 14, 14, 12, 16], 1):
+            ws2.cell(row=r, column=10).number_format = money
+        for i, w in enumerate([16, 7, 22, 12, 12, 16, 11, 11, 8, 14, 14, 12, 16], 1):
             ws2.column_dimensions[chr(64 + i)].width = w
 
     buf = BytesIO()
@@ -1835,6 +1910,43 @@ class MarkPaidIn(BaseModel):
     payment_ref: Optional[str] = None
 
 
+class PayCycleIn(BaseModel):
+    cycle: str                            # e.g. "2026-06-R1"
+    payment_ref: Optional[str] = None
+    dte_code: Optional[str] = None        # optional: pay only this DTE within the cycle
+
+
+def _payment_block_reason(row: DtePresiteTracking, inc: dict) -> str | None:
+    """Why this row can't be paid, or None if payable. Shared by mark-paid + batch."""
+    if row.current_stage != STAGE_ACE_APPROVED:
+        return f"stage is {row.current_stage}, must be {STAGE_ACE_APPROVED}"
+    if row.dte_paid_at:
+        return "already marked paid"
+    # A report-bearing item (SSV/Pre-DT) must have its report uploaded; PAC earns
+    # DT only (log file checked by DTA) so it has no report requirement.
+    if (inc["report"] or 0) > 0 and not row.report_file_path:
+        return "report not uploaded for a report-bearing item"
+    return None
+
+
+def _apply_payment(db, row: DtePresiteTracking, inc: dict, actor: str | None,
+                   actor_name: str | None, ref: str | None, now: datetime) -> None:
+    """Freeze the computed income onto the row + log history. No validation —
+    callers must check _payment_block_reason first."""
+    row.dte_paid_at = now
+    row.dte_paid_by = actor
+    row.dte_payment_ref = ref
+    row.dte_paid_amount = inc["total"]
+    row.dte_paid_income_dt = inc["dt"]
+    row.dte_paid_income_report = inc["report"]
+    row.dte_paid_category = inc["category"]
+    row.dte_paid_site_count = inc["site_count"]
+    _record_history(db, tracking_id=row.id, stage=row.current_stage, action="mark-paid",
+                    actor_code=actor, actor_name=actor_name,
+                    notes=f"DTE payment marked paid · {inc['total']:.2f} THB ({inc['category']})"
+                          f"{(' · ref ' + ref) if ref else ''}")
+
+
 @router.post("/tracking/{tracking_id}/mark-paid")
 async def mark_paid(
     tracking_id: int,
@@ -1850,37 +1962,62 @@ async def mark_paid(
     )).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "Tracking row not found")
-    # Guard: only approved work is payable (cannot pay un-approved / unfinished sites)
-    if row.current_stage != STAGE_ACE_APPROVED:
-        raise HTTPException(
-            409, f"Cannot mark paid: stage is {row.current_stage}, must be {STAGE_ACE_APPROVED}")
-    # Guard: idempotency — never silently overwrite an existing payment
-    if row.dte_paid_at:
-        raise HTTPException(409, "Already marked paid; unmark first to re-pay")
-    # Freeze the computed income onto the row so the paid total can't drift later
     inc = await _compute_income_for_tracking(db, row)
-    # Guard: a report-bearing item (SSV/Pre-DT, report component > 0) must have its
-    # report uploaded before payment. PAC earns DT only (log file checked by DTA)
-    # so it has no report requirement.
-    if (inc["report"] or 0) > 0 and not row.report_file_path:
-        raise HTTPException(409, "Cannot mark paid: report not uploaded for a report-bearing item")
+    reason = _payment_block_reason(row, inc)
+    if reason:
+        raise HTTPException(409, f"Cannot mark paid: {reason}")
     now = datetime.now(timezone.utc)
     actor = payload.get("employee_code") or payload.get("sub")
-    row.dte_paid_at = now
-    row.dte_paid_by = actor
-    row.dte_payment_ref = body.payment_ref
-    row.dte_paid_amount = inc["total"]
-    row.dte_paid_income_dt = inc["dt"]
-    row.dte_paid_income_report = inc["report"]
-    row.dte_paid_category = inc["category"]
-    row.dte_paid_site_count = inc["site_count"]
-    _record_history(db, tracking_id=tracking_id, stage=row.current_stage, action="mark-paid",
-                    actor_code=actor, actor_name=payload.get("name") or actor,
-                    notes=f"DTE payment marked paid · {inc['total']:.2f} THB ({inc['category']})"
-                          f"{(' · ref ' + body.payment_ref) if body.payment_ref else ''}")
+    _apply_payment(db, row, inc, actor, payload.get("name") or actor, body.payment_ref, now)
     await db.commit()
     return {"ok": True, "tracking_id": tracking_id, "paid": True, "dte_paid_at": _iso(now),
             "amount": inc["total"], "category": inc["category"]}
+
+
+@router.post("/finance/pay-cycle")
+async def pay_cycle(
+    body: PayCycleIn,
+    payload: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Batch-pay every payable site in a pay cycle (e.g. '2026-06-R1') in one go.
+
+    Cycle membership is derived from each row's ACE-approval date. Rows that
+    aren't payable (wrong stage, already paid, missing report) are skipped, not
+    errored, so a partial cycle still settles. All paid rows share payment_ref.
+    """
+    if payload.get("role") not in ROLE_FINANCE:
+        raise HTTPException(403, "Only Finance/PM/Admin may mark payments")
+    rows = (await db.execute(
+        select(DtePresiteTracking).where(
+            DtePresiteTracking.current_stage == STAGE_ACE_APPROVED,
+            DtePresiteTracking.dte_paid_at.is_(None),
+        )
+    )).scalars().all()
+    now = datetime.now(timezone.utc)
+    actor = payload.get("employee_code") or payload.get("sub")
+    actor_name = payload.get("name") or actor
+    paid_count = 0
+    total = 0.0
+    skipped = 0
+    for row in rows:
+        appr_at = row.ace_approve_at or (row.check_at if row.check_result == "PASS" else None) or row.completed_at
+        cyc, _ = _cycle_for(appr_at)
+        if cyc != body.cycle:
+            continue
+        if body.dte_code and (row.assigned_dte_code or "").upper() != body.dte_code.upper():
+            continue
+        inc = await _compute_income_for_tracking(db, row)
+        if _payment_block_reason(row, inc):
+            skipped += 1
+            continue
+        _apply_payment(db, row, inc, actor, actor_name, body.payment_ref, now)
+        paid_count += 1
+        total += inc["total"]
+    if paid_count:
+        await db.commit()
+    return {"ok": True, "cycle": body.cycle, "paid_count": paid_count,
+            "skipped": skipped, "total": total, "currency": "THB"}
 
 
 @router.post("/tracking/{tracking_id}/unmark-paid")

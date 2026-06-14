@@ -56,8 +56,6 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
   const [cycleFilter, setCycleFilter] = useState('')
   const [dtaFilter, setDtaFilter] = useState('')
   const [busyId, setBusyId] = useState(null)
-  const [candidates, setCandidates] = useState([])
-  const [assigningId, setAssigningId] = useState(null)  // row id showing the picker
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -84,45 +82,26 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
 
   useEffect(() => { reload() }, [reload])
 
-  // DTA candidates for the assign dropdown (active login users)
-  useEffect(() => {
-    apiFetch('/api/presite/dta-candidates')
-      .then(r => r.ok ? r.json() : { data: [] })
-      .then(d => setCandidates(d.data || []))
-      .catch(() => setCandidates([]))
-  }, [])
-
   const monthsAvailable = Array.from(new Set(rows.map(r => r.month).filter(Boolean))).sort().reverse()
 
-  async function markPaid(id) {
+  async function markPaid(rfName) {
     const ref = window.prompt('Payment reference (optional):', '')
     if (ref === null) return
-    setBusyId(id)
+    setBusyId(rfName)
     try {
-      const res = await apiFetch(`/api/presite/tracking/${id}/dta-mark-paid`, {
-        method: 'POST', body: JSON.stringify({ payment_ref: ref || null }),
+      const res = await apiFetch('/api/presite/dta/finance/mark-paid', {
+        method: 'POST', body: JSON.stringify({ rf_cluster_name: rfName, payment_ref: ref || null }),
       })
       if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.detail || 'Failed'); return }
       await reload()
     } finally { setBusyId(null) }
   }
-  async function unmarkPaid(id) {
+  async function unmarkPaid(rfName) {
     if (!window.confirm('Revert this payment to UNPAID?')) return
-    setBusyId(id)
+    setBusyId(rfName)
     try {
-      const res = await apiFetch(`/api/presite/tracking/${id}/dta-unmark-paid`, { method: 'POST' })
-      if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.detail || 'Failed'); return }
-      await reload()
-    } finally { setBusyId(null) }
-  }
-
-  // Assign / change / clear the DTA for a cluster row (code from the dropdown)
-  async function assignDta(id, code) {
-    setBusyId(id)
-    setAssigningId(null)
-    try {
-      const res = await apiFetch(`/api/presite/tracking/${id}/assign-dta`, {
-        method: 'POST', body: JSON.stringify({ dta_code: code || null }),
+      const res = await apiFetch('/api/presite/dta/finance/unmark-paid', {
+        method: 'POST', body: JSON.stringify({ rf_cluster_name: rfName }),
       })
       if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.detail || 'Failed'); return }
       await reload()
@@ -419,10 +398,9 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
                   <thead>
                     <tr className="bg-slate-50 text-left text-[.6rem] font-black uppercase text-slate-500">
                       <th className="px-4 py-3">Cluster</th>
-                      <th className="px-4 py-3">DTA</th>
+                      <th className="px-4 py-3">DTA Owner</th>
                       <th className="px-4 py-3">Rate Category</th>
-                      <th className="px-4 py-3">DT Date</th>
-                      <th className="px-4 py-3">Approved</th>
+                      <th className="px-4 py-3">PAC Approved</th>
                       <th className="px-4 py-3">Cycle</th>
                       <th className="px-4 py-3 text-right">Income</th>
                       <th className="px-4 py-3 text-center">Status</th>
@@ -431,26 +409,12 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
                   </thead>
                   <tbody>
                     {rows.map(r => (
-                      <tr key={r.tracking_id} className={`border-t border-slate-100 hover:bg-slate-50/60 ${r.payable ? 'bg-red-50/30' : ''}`}>
-                        <td className="px-4 py-3 font-mono font-black" style={{ color: PURPLE }}>{r.site_code}</td>
+                      <tr key={r.rf_cluster_name} className={`border-t border-slate-100 hover:bg-slate-50/60 ${r.payable ? 'bg-red-50/30' : ''}`}>
+                        <td className="px-4 py-3 font-mono font-black" style={{ color: PURPLE }}>{r.rf_cluster_name}</td>
                         <td className="px-4 py-3">
-                          {r.dta_code
-                            ? <div className="font-bold text-slate-700">{r.dta_name}<div className="text-[.58rem] font-mono text-slate-400">{r.dta_code}</div></div>
-                            : <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[.58rem] font-black text-rose-600">unassigned</span>}
-                          {!r.paid && (assigningId === r.tracking_id ? (
-                            <select autoFocus defaultValue={r.dta_code || ''} disabled={busyId === r.tracking_id}
-                              onChange={e => assignDta(r.tracking_id, e.target.value)}
-                              onBlur={() => setAssigningId(null)}
-                              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[.62rem] font-bold text-slate-700">
-                              <option value="">— clear —</option>
-                              {candidates.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
-                            </select>
-                          ) : (
-                            <button onClick={() => setAssigningId(r.tracking_id)}
-                              className="mt-1 block text-[.58rem] font-black text-blue-600 hover:underline">
-                              {r.dta_code ? 'change' : '+ assign DTA'}
-                            </button>
-                          ))}
+                          {(r.dta_code || r.dta_name)
+                            ? <div className="font-bold text-slate-700">{r.dta_name}{r.dta_code && <div className="text-[.58rem] font-mono text-slate-400">{r.dta_code}</div>}</div>
+                            : <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[.58rem] font-black text-rose-600" title="Assign on the DTA monitor page">unassigned</span>}
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[.6rem] font-black" style={{ background: `${PURPLE}14`, color: PURPLE }}>
@@ -458,10 +422,9 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
                           </span>
                           {r.needs_review && <div className="mt-0.5 text-[.56rem] font-black text-amber-600" title={r.review_reason || 'Rate is a best-guess default — verify before paying'}>⚠ verify rate</div>}
                         </td>
-                        <td className="px-4 py-3 text-xs font-bold text-slate-500">{r.dt_done_date || '—'}</td>
                         <td className="px-4 py-3">
                           {r.approved_at
-                            ? <div><div className="text-xs font-bold text-emerald-700">{(r.approved_at||'').slice(0,10)}</div><div className="text-[.56rem] font-bold text-slate-400">{r.approved_by_name}</div></div>
+                            ? <div><div className="text-xs font-bold text-emerald-700">{(r.approved_at||'').slice(0,10)}</div><div className="text-[.56rem] font-bold text-slate-400">phase {r.phase}</div></div>
                             : <span className="text-xs font-bold text-slate-300">—</span>}
                         </td>
                         <td className="px-4 py-3">
@@ -482,15 +445,15 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
                         </td>
                         <td className="px-4 py-3 text-right">
                           {r.paid
-                            ? <button disabled={busyId === r.tracking_id} onClick={() => unmarkPaid(r.tracking_id)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 hover:bg-slate-50">Unmark</button>
-                            : <button disabled={busyId === r.tracking_id || !r.payable} onClick={() => markPaid(r.tracking_id)} title={!r.payable ? 'Not ready: needs ACE approval' : ''} className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: GREEN }}>{busyId === r.tracking_id ? '…' : 'Mark Paid'}</button>}
+                            ? <button disabled={busyId === r.rf_cluster_name} onClick={() => unmarkPaid(r.rf_cluster_name)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 hover:bg-slate-50">Unmark</button>
+                            : <button disabled={busyId === r.rf_cluster_name || !r.payable} onClick={() => markPaid(r.rf_cluster_name)} title={!r.payable ? 'Not ready: needs PAC Approved + an assigned DTA' : ''} className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: GREEN }}>{busyId === r.rf_cluster_name ? '…' : 'Mark Paid'}</button>}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-slate-200 bg-slate-50">
-                      <td className="px-4 py-3 font-black text-slate-900" colSpan={6}>Total ({rows.length} clusters)</td>
+                      <td className="px-4 py-3 font-black text-slate-900" colSpan={5}>Total ({rows.length} clusters)</td>
                       <td className="px-4 py-3 text-right font-mono font-black text-slate-900">{fmtBaht(rows.reduce((a,r)=>a+r.income,0))}</td>
                       <td colSpan={2}></td>
                     </tr>

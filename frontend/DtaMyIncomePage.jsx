@@ -60,7 +60,7 @@ export default function DtaMyIncomePage({ authenticatedUser, onLogout }) {
   const reload = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await apiFetch('/api/presite/my-dta-sites')
+      const res = await apiFetch('/api/presite/dta/my-income')
       const d = await res.json()
       setRows(d.data || [])
       setByCycle(d.by_cycle || [])

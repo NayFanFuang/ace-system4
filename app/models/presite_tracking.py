@@ -129,16 +129,6 @@ class DtePresiteTracking(Base):
     dte_paid_category: Mapped[str | None] = mapped_column(String(40))
     dte_paid_site_count: Mapped[int | None] = mapped_column(Integer)
 
-    # DTA payment status — added 2026-06-14. DTA (drive-test analyst) is paid a
-    # fixed per-cluster rate on PAC (Cluster/SSOA) work; mirrors the DTE flow.
-    # Frozen snapshot locks the amount at mark-paid time (NULL on unpaid rows).
-    dta_paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    dta_paid_by: Mapped[str | None] = mapped_column(String(120))
-    dta_payment_ref: Mapped[str | None] = mapped_column(String(120))
-    dta_paid_amount: Mapped[float | None] = mapped_column(Numeric(14, 2))
-    dta_paid_category: Mapped[str | None] = mapped_column(String(40))
-    dta_paid_site_count: Mapped[int | None] = mapped_column(Integer)
-
     current_stage: Mapped[str] = mapped_column(String(30), default=STAGE_FULL_ONAIR, index=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

@@ -146,26 +146,28 @@ function PipelineFunnel({ byPhase }) {
   )
 }
 
-// Monthly trend — collected (bill HW) vs DTE paid, per month
+// Monthly trend — plan (target) vs collected (bill HW) vs DTE paid, per month
 function MonthlyTrend({ monthly }) {
   if (!monthly || monthly.length === 0) {
     return <div className="py-8 text-center text-sm font-bold text-slate-400">ยังไม่มีข้อมูลการเก็บเงิน/จ่ายรายเดือน</div>
   }
-  const max = Math.max(1, ...monthly.map(m => Math.max(m.collected, m.dte_paid)))
+  const max = Math.max(1, ...monthly.map(m => Math.max(m.plan || 0, m.collected, m.dte_paid)))
   const months = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
   const mLabel = ym => { const [y, m] = (ym || '').split('-'); return `${months[parseInt(m, 10)] || m} ${(y || '').slice(2)}` }
   return (
     <div>
-      <div className="mb-3 flex items-center gap-4 text-xs font-black">
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs font-black">
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border-2 border-slate-300" /> เป้า (Plan)</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: GREEN }} /> เก็บเงินได้</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: CYAN }} /> จ่าย DTE</span>
       </div>
       <div className="flex items-end gap-3 overflow-x-auto pb-2" style={{ minHeight: 160 }}>
         {monthly.map(m => (
-          <div key={m.month} className="flex shrink-0 flex-col items-center gap-1" style={{ width: 54 }}>
+          <div key={m.month} className="flex shrink-0 flex-col items-center gap-1" style={{ width: 66 }}>
             <div className="flex h-32 items-end gap-1">
-              <div className="w-5 rounded-t" style={{ height: `${(m.collected / max) * 100}%`, background: GREEN }} title={`เก็บได้ ${fmtBaht(m.collected)}`} />
-              <div className="w-5 rounded-t" style={{ height: `${(m.dte_paid / max) * 100}%`, background: CYAN }} title={`จ่าย DTE ${fmtBaht(m.dte_paid)}`} />
+              <div className="w-4 rounded-t border-2 border-slate-300 bg-slate-50" style={{ height: `${((m.plan || 0) / max) * 100}%` }} title={`เป้า ${fmtBaht(m.plan)}`} />
+              <div className="w-4 rounded-t" style={{ height: `${(m.collected / max) * 100}%`, background: GREEN }} title={`เก็บได้ ${fmtBaht(m.collected)}`} />
+              <div className="w-4 rounded-t" style={{ height: `${(m.dte_paid / max) * 100}%`, background: CYAN }} title={`จ่าย DTE ${fmtBaht(m.dte_paid)}`} />
             </div>
             <div className="text-[.62rem] font-black text-slate-500">{mLabel(m.month)}</div>
           </div>
@@ -226,6 +228,8 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
   const [ownerRole, setOwnerRole] = useState('')
   const [billingState, setBillingState] = useState('')
   const [payState, setPayState] = useState('')
+  const [monthFrom, setMonthFrom] = useState('')
+  const [monthTo, setMonthTo] = useState('')
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -237,6 +241,8 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
       if (ownerRole) params.set('owner_role', ownerRole)
       if (billingState) params.set('billing_state', billingState)
       if (payState) params.set('dte_pay_state', payState)
+      if (monthFrom) params.set('month_from', monthFrom)
+      if (monthTo) params.set('month_to', monthTo)
       const res = await apiFetch(`/api/project-pos/collection-dashboard?${params.toString()}`)
       const json = await res.json()
       setD({ ...EMPTY, ...json })
@@ -245,7 +251,7 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
     } finally {
       setLoading(false)
     }
-  }, [aceProject, workType, vendor, ownerRole, billingState, payState])
+  }, [aceProject, workType, vendor, ownerRole, billingState, payState, monthFrom, monthTo])
 
   useEffect(() => { reload() }, [reload])
 
@@ -313,8 +319,9 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
 
   function clearFilters() {
     setAceProject(''); setWorkType(''); setVendor(''); setOwnerRole(''); setBillingState(''); setPayState(''); setSearch('')
+    setMonthFrom(''); setMonthTo('')
   }
-  const hasFilters = aceProject || workType || vendor || ownerRole || billingState || payState || search
+  const hasFilters = aceProject || workType || vendor || ownerRole || billingState || payState || search || monthFrom || monthTo
 
   const name = authenticatedUser?.name || ''
 
@@ -397,6 +404,14 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                 options={[['NOT_BILLED', 'ยังไม่เก็บ'], ['PARTIAL', 'เก็บบางส่วน'], ['BILLED', 'เก็บแล้ว'], ['REJECTED', 'Reject']]} />
               <Select value={payState} onChange={setPayState} placeholder="สถานะจ่าย DTE"
                 options={[['UNPAID', 'ค้างจ่าย'], ['PAID', 'จ่ายแล้ว']]} />
+              <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1">
+                <span className="text-[.62rem] font-black text-slate-400">เดือน</span>
+                <input type="month" value={monthFrom} onChange={e => setMonthFrom(e.target.value)}
+                  className="w-[7.5rem] bg-transparent text-xs font-bold text-slate-700 outline-none" />
+                <span className="text-slate-300">–</span>
+                <input type="month" value={monthTo} onChange={e => setMonthTo(e.target.value)}
+                  className="w-[7.5rem] bg-transparent text-xs font-bold text-slate-700 outline-none" />
+              </div>
               <div className="relative">
                 <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหา PO / ไซต์ / invoice"
@@ -433,7 +448,14 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                 </Card>
               </section>
               <Card className="p-5">
-                <h3 className="mb-4 inline-flex items-center gap-2 text-base font-black text-slate-950"><TrendingUp size={18} style={{ color: GREEN }} /> แนวโน้มรายเดือน — เก็บเงินได้ vs จ่าย DTE</h3>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="inline-flex items-center gap-2 text-base font-black text-slate-950"><TrendingUp size={18} style={{ color: GREEN }} /> แนวโน้มรายเดือน — เป้า / เก็บได้ / จ่าย DTE</h3>
+                  {s.total_plan > 0 && (
+                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                      เป้ารวม {fmtBaht(s.total_plan)} · เก็บได้ <span style={{ color: s.plan_collection_rate >= 80 ? GREEN : s.plan_collection_rate >= 50 ? AMBER : RED }}>{s.plan_collection_rate || 0}%</span>
+                    </span>
+                  )}
+                </div>
                 <MonthlyTrend monthly={d.monthly} />
               </Card>
               <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">

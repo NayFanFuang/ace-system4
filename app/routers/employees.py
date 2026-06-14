@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import ROLE_LABELS, ROLE_SCOPES, get_current_user, require_hr_read_user, require_hr_user, require_po_finance_action_user, require_po_tracking_user, require_project_user, require_self_or_admin
 from app.models.auth_user import AuthUser
+from app.models.billing_plan import BillingPlan
 from app.models.clock import ClockSite, ClockSession
 from app.models.employee import Employee, EmployeeRelocation, HWImportLog, ProjectAssignment, ProjectCatalog, ProjectPO, ProjectSite
 from app.services.auth_service import hash_password, validate_password_policy
@@ -386,6 +387,22 @@ def _po_dte_pay_state(row: ProjectPO) -> str:
     if row.dte_paid_at or status in {"DTE_PAID", "CLOSED"}:
         return "PAID"
     return "UNPAID"
+
+
+def _po_months(row: ProjectPO) -> set[str]:
+    """All "YYYY-MM" months this PO touches — billing plan, actual billed, paid,
+    or on-air. Used by the month-range filter so both planned and collected POs
+    surface within the selected window."""
+    months: set[str] = set()
+    for v in (row.ac1_plan_month, row.ac2_plan_month):
+        if v:
+            months.add(v.strip())
+    for dt in (row.ac1_billed_at, row.ac2_billed_at, row.hw_billed_at, row.dte_paid_at):
+        if dt:
+            months.add(dt.strftime("%Y-%m"))
+    if row.on_air:
+        months.add(row.on_air.strftime("%Y-%m"))
+    return months
 
 
 def _infer_po_workflow_defaults(body: POIn) -> dict:
@@ -2423,6 +2440,8 @@ async def project_po_collection_dashboard(
     billing_state: str = Query(""),   # NOT_BILLED | PARTIAL | BILLED | REJECTED
     dte_pay_state: str = Query(""),   # PAID | UNPAID
     aging_min: int = Query(0),        # only rows stuck >= N days
+    month_from: str = Query(""),      # "YYYY-MM" — filter PO months >= this
+    month_to: str = Query(""),        # "YYYY-MM" — filter PO months <= this
     payload: dict = Depends(require_po_tracking_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -2451,6 +2470,21 @@ async def project_po_collection_dashboard(
 
     bs_filter = billing_state.upper()
     ps_filter = dte_pay_state.upper()
+    mf = month_from.strip()
+    mt = month_to.strip()
+
+    def _in_month_range(row: ProjectPO) -> bool:
+        if not mf and not mt:
+            return True
+        months = _po_months(row)
+        if not months:
+            return False
+        if mf and not any(m >= mf for m in months):
+            return False
+        if mt and not any(m <= mt for m in months):
+            return False
+        # require at least one month inside [mf, mt]
+        return any((not mf or m >= mf) and (not mt or m <= mt) for m in months)
 
     def _amt(row: ProjectPO) -> float:
         try:
@@ -2482,6 +2516,8 @@ async def project_po_collection_dashboard(
         slot["value"] += value
 
     for row in all_rows:
+        if not _in_month_range(row):
+            continue
         b_state = _po_billing_state(row)
         p_state = _po_dte_pay_state(row)
         # Row-level filters that depend on derived state
@@ -2562,6 +2598,35 @@ async def project_po_collection_dashboard(
 
     aging_watch.sort(key=lambda r: r["aging_days"], reverse=True)
 
+    # Plan vs Actual — top-down billing targets (BillingPlan) per month, scoped
+    # to the same project/vendor filters and the month range when set.
+    plan_stmt = select(BillingPlan)
+    if ace_project_code:
+        plan_stmt = plan_stmt.where(BillingPlan.ace_project_code == ace_project_code.upper())
+    if vendor:
+        plan_stmt = plan_stmt.where(BillingPlan.vendor == vendor.upper())
+    plan_rows = (await db.execute(plan_stmt)).scalars().all()
+    plan_by_month: dict[str, float] = {}
+    for pr in plan_rows:
+        m = (pr.month or "").strip()
+        if not m:
+            continue
+        if mf and m < mf:
+            continue
+        if mt and m > mt:
+            continue
+        plan_by_month[m] = plan_by_month.get(m, 0.0) + float(pr.planned_amount or 0)
+
+    all_months = sorted(set(monthly.keys()) | set(plan_by_month.keys()))
+    monthly_out = [{
+        "month": m,
+        "plan": round(plan_by_month.get(m, 0.0), 2),
+        "collected": round(monthly.get(m, {}).get("collected", 0.0), 2),
+        "dte_paid": round(monthly.get(m, {}).get("dte_paid", 0.0), 2),
+    } for m in all_months]
+    total_plan = round(sum(plan_by_month.values()), 2)
+    plan_collection_rate = round(100.0 * summary["billed_value"] / total_plan, 1) if total_plan > 0 else 0.0
+
     def _flatten(bucket: dict) -> list[dict]:
         return sorted(
             ({"key": k, "count": v["count"], "value": round(v["value"], 2)} for k, v in bucket.items()),
@@ -2575,16 +2640,15 @@ async def project_po_collection_dashboard(
             "collection_rate": collection_rate,
             "dte_pay_rate": dte_pay_rate,
             "outstanding_value": round(summary["not_billed_value"] + summary["partial_value"], 2),
+            "total_plan": total_plan,
+            "plan_collection_rate": plan_collection_rate,
         },
         "by_status": _flatten(by_status),
         "by_phase": _flatten(by_phase),
         "by_owner": _flatten(by_owner),
         "by_vendor": _flatten(by_vendor),
         "by_project": _flatten(by_project),
-        "monthly": [
-            {"month": k, "collected": round(v["collected"], 2), "dte_paid": round(v["dte_paid"], 2)}
-            for k, v in sorted(monthly.items())
-        ],
+        "monthly": monthly_out,
         "aging_watch": aging_watch[:60],
         "data": rows_out,
         "total": len(rows_out),

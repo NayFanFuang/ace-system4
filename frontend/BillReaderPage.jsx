@@ -2,11 +2,13 @@ import React, { useState, useRef, useMemo, useEffect } from 'react'
 import {
   Bell, CalendarDays, ChevronDown, FileText, Home, LogOut, Menu, Search,
   Upload, FileUp, FileSpreadsheet, ScanLine, AlertTriangle, Download, X, Trash2,
+  BookCheck, Save,
 } from 'lucide-react'
 import { apiFetch } from './src/apiFetch.js'
 
 const ACE_BLUE = '#2447d8'
 const ACE_RED = '#c73b32'
+const ACE_GREEN = '#0e9f6e'
 const COMPANY = 'AirConnect Engineering'
 
 const FINANCE_NAV = [
@@ -14,6 +16,7 @@ const FINANCE_NAV = [
   { href: '/finance/po-import', label: 'PO Import (HW)', icon: FileUp },
   { href: '/finance/dte-payments', label: 'DTE Payments', icon: FileText },
   { href: '/finance/bill-reader', label: 'Bill Reader → PV', icon: ScanLine, active: true },
+  { href: '/finance/accounting', label: 'Accounting (PV Ledger)', icon: BookCheck },
 ]
 
 const ID_KIND_LABEL = {
@@ -101,6 +104,8 @@ export default function BillReaderPage({ authenticatedUser, onLogout }) {
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState('')
   const [error, setError] = useState('')
   const [vendor, setVendor] = useState('')
   const [header, setHeader] = useState(null)
@@ -201,7 +206,44 @@ export default function BillReaderPage({ authenticatedUser, onLogout }) {
     finally { setGenerating(false) }
   }
 
-  function reset() { setFile(null); setHeader(null); setLines([]); setVendor(''); setError('') }
+  async function saveToAccounting(allowDuplicate = false) {
+    setSaving(true); setError(''); setSavedMsg('')
+    try {
+      const body = {
+        vendor, header: header || {}, bill_type: billType, filename: pvFilename(),
+        allow_duplicate: allowDuplicate,
+        lines: rows.map(r => ({
+          identifier: r.identifier, period: r.period, amount: r.amount, vat: r.vat,
+          vendor, desc: buildDesc(r, profile, vendor), ocr: r._ocr || {},
+        })),
+      }
+      const res = await apiFetch('/api/finance/accounting/vouchers', { method: 'POST', body: JSON.stringify(body) })
+      const data = await readJsonSafe(res)
+      // duplicate guard: backend ตอบ 409 + detail.code === 'duplicate' ให้ยืนยันก่อนบันทึกซ้ำ
+      const detail = data && data.detail
+      if (res.status === 409 && detail && typeof detail === 'object' && detail.code === 'duplicate') {
+        setSaving(false)
+        if (window.confirm(`${detail.message}`)) { return saveToAccounting(true) }
+        return
+      }
+      if (!res.ok) throw new Error(typeof detail === 'string' ? detail : httpErr(res, data, 'Failed to save to accounting'))
+      // แนบไฟล์ PDF ต้นฉบับเข้ากับ voucher (เพื่อ audit/ตรวจสอบ) — ไม่ให้ล้มถ้าแนบพลาด
+      let attachNote = ''
+      if (file && data.id) {
+        try {
+          const afd = new FormData()
+          afd.append('file', file)
+          const ares = await apiFetch(`/api/finance/accounting/vouchers/${data.id}/attachment`, { method: 'POST', body: afd })
+          attachNote = ares.ok ? ' · original PDF attached' : ' · (PDF attach failed)'
+        } catch { attachNote = ' · (PDF attach failed)' }
+      }
+      setSavedMsg(`Saved to accounting — ${data.doc_no || data.pv_no || 'PV'} (status: Draft)${attachNote}. View it in the PV Ledger.`)
+      refreshStats()
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  function reset() { setFile(null); setHeader(null); setLines([]); setVendor(''); setError(''); setSavedMsg('') }
 
   const HF = ([k, label]) => (
     <label key={k} className="flex flex-col gap-1">
@@ -381,8 +423,18 @@ export default function BillReaderPage({ authenticatedUser, onLogout }) {
                   </div>
                 </section>
 
+                {savedMsg && (
+                  <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                    <BookCheck size={18} />{savedMsg}
+                    <a href="/finance/accounting" className="ml-2 underline underline-offset-2 hover:text-emerald-900">Open PV Ledger →</a>
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   <div className="mr-auto text-sm font-semibold text-slate-400">WHT {pct(whtRate)} and Net are computed automatically per bill type · change "Bill type" above to adjust the formula/form</div>
+                  <button type="button" onClick={() => saveToAccounting()} disabled={saving || rows.length === 0}
+                    className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black text-white shadow-sm transition disabled:opacity-50" style={{ background: ACE_GREEN }}>
+                    {saving ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />Saving…</> : <><Save size={18} />Save to Accounting</>}
+                  </button>
                   <button type="button" onClick={generatePV} disabled={generating || rows.length === 0}
                     className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black text-white shadow-sm transition disabled:opacity-50" style={{ background: ACE_RED }}>
                     {generating ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />Generating…</> : <><Download size={18} />Generate PV (Download Excel)</>}

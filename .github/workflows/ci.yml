@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend — compile + accounting tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # runtime deps needed to import the accounting module
+          # (sqlalchemy + asyncpg for the engine, pydantic for the app package)
+          pip install SQLAlchemy==2.0.36 asyncpg==0.30.0 pydantic==2.10.4
+          pip install -r requirements-dev.txt
+
+      - name: Byte-compile (syntax smoke check)
+        run: python -m compileall -q app tests
+
+      - name: Run accounting test suite
+        # อื่น ๆ ใน tests/ เป็น template ที่ยังไม่มี fixture — รันเฉพาะชุดที่พร้อม
+        # ใช้ `python -m pytest` เพื่อให้ repo root อยู่บน sys.path (import app ได้)
+        run: python -m pytest tests/test_accounting.py -v --asyncio-mode=auto

@@ -1,0 +1,65 @@
+-- Accounting ledger: บันทึกบิลที่ scan แล้วเข้าระบบบัญชี (Payment Voucher)
+-- สถานะ: DRAFT (ร่าง) -> APPROVED (อนุมัติ) -> PAID (จ่ายแล้ว)
+-- จำนวนเงินใช้ NUMERIC(18,2) (ห้าม float ในงานบัญชี)
+-- หมายเหตุ: backend สร้างตารางจาก models (Base.metadata.create_all) อยู่แล้ว
+-- ไฟล์นี้ไว้ apply กับ prod ที่ schema ไม่ถูก recreate อัตโนมัติ
+
+CREATE TABLE IF NOT EXISTS payment_vouchers (
+    id              SERIAL PRIMARY KEY,
+    doc_no          VARCHAR(30)   NOT NULL DEFAULT '',   -- running no. ระบบ (PV-YYYY-0001)
+    doc_year        VARCHAR(4)    NOT NULL DEFAULT '',
+    doc_seq         INTEGER       NOT NULL DEFAULT 0,
+    pv_no           VARCHAR(60)   NOT NULL DEFAULT '',   -- เลขอ้างอิงจากฟอร์ม
+    item            VARCHAR(30)   NOT NULL DEFAULT '',
+    pv_date         VARCHAR(30)   NOT NULL DEFAULT '',
+    period_month    VARCHAR(7)    NOT NULL DEFAULT '',
+    bill_type       VARCHAR(30)   NOT NULL DEFAULT '',
+    vendor          VARCHAR(255)  NOT NULL DEFAULT '',
+    project         VARCHAR(255)  NOT NULL DEFAULT '',
+    requester       VARCHAR(255)  NOT NULL DEFAULT '',
+    issued_by       VARCHAR(255)  NOT NULL DEFAULT '',
+    status          VARCHAR(20)   NOT NULL DEFAULT 'DRAFT',
+    due_date        DATE,                                -- วันครบกำหนดจ่าย (AP aging)
+    content_hash    VARCHAR(64)   NOT NULL DEFAULT '',   -- กันบิลซ้ำ
+    amount_total    NUMERIC(18,2) NOT NULL DEFAULT 0,    -- ยอดก่อน VAT (ค่าใช้จ่ายจริง)
+    vat_total       NUMERIC(18,2) NOT NULL DEFAULT 0,    -- VAT 7% (ภาษีซื้อ)
+    wht_total       NUMERIC(18,2) NOT NULL DEFAULT 0,    -- หัก ณ ที่จ่าย
+    net_total       NUMERIC(18,2) NOT NULL DEFAULT 0,    -- ยอดจ่ายสุทธิ
+    note            TEXT          NOT NULL DEFAULT '',
+    source_filename VARCHAR(255)  NOT NULL DEFAULT '',
+    attachment_path VARCHAR(255),
+    attachment_name VARCHAR(255)  NOT NULL DEFAULT '',
+    created_by      VARCHAR(30)   NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    approved_by     VARCHAR(30),
+    approved_at     TIMESTAMPTZ,
+    paid_by         VARCHAR(30),
+    paid_at         TIMESTAMPTZ,
+    payment_ref     VARCHAR(120)  NOT NULL DEFAULT '',
+    CONSTRAINT uq_payment_vouchers_doc_no UNIQUE (doc_no)
+);
+
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_doc_no        ON payment_vouchers (doc_no);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_doc_year      ON payment_vouchers (doc_year);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_pv_no         ON payment_vouchers (pv_no);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_period_month  ON payment_vouchers (period_month);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_bill_type     ON payment_vouchers (bill_type);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_status        ON payment_vouchers (status);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_due_date      ON payment_vouchers (due_date);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_content_hash  ON payment_vouchers (content_hash);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_created_by    ON payment_vouchers (created_by);
+
+CREATE TABLE IF NOT EXISTS payment_voucher_lines (
+    id          SERIAL PRIMARY KEY,
+    voucher_id  INTEGER NOT NULL REFERENCES payment_vouchers(id) ON DELETE CASCADE,
+    seq         INTEGER NOT NULL DEFAULT 0,
+    identifier  VARCHAR(60)  NOT NULL DEFAULT '',
+    period      VARCHAR(60)  NOT NULL DEFAULT '',
+    description TEXT         NOT NULL DEFAULT '',
+    amount      NUMERIC(18,2) NOT NULL DEFAULT 0,
+    vat         NUMERIC(18,2) NOT NULL DEFAULT 0,
+    wht         NUMERIC(18,2) NOT NULL DEFAULT 0,
+    net         NUMERIC(18,2) NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS ix_payment_voucher_lines_voucher_id ON payment_voucher_lines (voucher_id);

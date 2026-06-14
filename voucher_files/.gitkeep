@@ -1,0 +1,2 @@
+# Private storage for payment-voucher PDF attachments (financial docs).
+# Served only via authenticated API, never the public /photos static mount.

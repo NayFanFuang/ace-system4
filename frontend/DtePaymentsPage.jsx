@@ -365,6 +365,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                               {isPac ? <Layers size={10} /> : <Wifi size={10} />} {r.work_type}
                             </span>
                             <div className="mt-1 text-[.58rem] font-bold text-slate-400">{r.category}{r.site_count > 1 ? ` ×${r.site_count}` : ''}</div>
+                            {r.needs_review && <div className="mt-0.5 text-[.56rem] font-black text-amber-600" title={r.review_reason || 'Rate is a best-guess default — verify before paying'}>⚠ verify rate</div>}
                           </td>
                           <td className="px-4 py-3 text-xs font-bold text-slate-500">{r.dt_done_date || '—'}</td>
                           <td className="px-4 py-3">

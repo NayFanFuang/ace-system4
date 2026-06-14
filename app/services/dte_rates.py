@@ -3,7 +3,12 @@
 Income is NOT the PO price. It is a fixed rate table (DT + Report components),
 keyed by work category and (for SSV) layer tier.
 
-HWT2304 is a TRUE project → use TRUE operator rates for Cluster/SSOA.
+Operator (TRUE vs AIS) is read from the item_dis prefix, matching
+scripts/classify_ace_project.py:
+    A_… → AIS   (HWT2604)
+    B_… → TRUE  (HWT2304 / HWT2601)
+PAC Cluster/SSOA rates differ by operator; SSV/Pre-DT are TRUE-rated only
+(the rate sheet has no AIS column for them).
 
 DTE rate table (THB). SSV earns DT + Report; PAC (Cluster/SSOA) earns DT only
 (the DTE rate sheet leaves the Report column blank for Cluster/SSOA):
@@ -30,6 +35,20 @@ SSOA_TRUE    = (1600, 0)
 CLUSTER_AIS  = (550, 0)
 SSOA_AIS     = (750, 0)
 PRE_DT       = (250, 50)
+
+
+def detect_operator(item_dis: str | None, operator: str | None = None) -> str:
+    """Resolve TRUE vs AIS for a line. Explicit operator wins; else item_dis prefix.
+
+    A_ → AIS, B_ → TRUE (per classify_ace_project.py). Anything else → TRUE
+    (TRUE is the default/legacy operator; AIS lines always carry the A_ prefix).
+    """
+    if operator:
+        return operator.upper()
+    t = (item_dis or "").strip().lower()
+    if t.startswith("a_"):
+        return "AIS"
+    return "TRUE"
 
 
 def _parse_layers(item_dis: str | None) -> int | None:
@@ -60,39 +79,56 @@ def _ssv_tier(layers: int) -> tuple[int, int, str]:
 
 
 def compute_income(work_type: str | None, item_dis: str | None,
-                   layers: int | None, site_count: int = 1) -> dict:
-    """Return {dt, report, total, unit_total, category, site_count} for a tracking row.
+                   layers: int | None, site_count: int = 1,
+                   operator: str | None = None) -> dict:
+    """Return {dt, report, total, unit_total, category, site_count, operator,
+    needs_review} for a tracking row.
 
-    site_count multiplies Cluster/SSOA (rate is per site; a cluster may hold N sites).
-    SSV is always 1 site.
+    site_count multiplies Cluster/SSOA (rate is per site; a cluster may hold N
+    sites). SSV is always 1 site. operator overrides the item_dis-prefix
+    detection. needs_review=True flags an SSV line whose layer tier could not be
+    determined (rate is a best-guess default, not an asserted value).
     """
     text = (item_dis or "").lower()
     wt = (work_type or "").upper()
+    op = detect_operator(item_dis, operator)
 
     # Category detection (most specific first)
     if "ssoa" in text:
-        dt, rep = SSOA_TRUE
+        dt, rep = SSOA_AIS if op == "AIS" else SSOA_TRUE
         n = max(1, site_count)
         return {"dt": dt * n, "report": rep * n, "total": (dt + rep) * n,
-                "unit_total": dt + rep, "category": "SSOA DT Opt", "site_count": n}
+                "unit_total": dt + rep, "category": f"SSOA DT Opt ({op})",
+                "site_count": n, "operator": op, "needs_review": False}
     if "cluster" in text:
-        dt, rep = CLUSTER_TRUE
+        dt, rep = CLUSTER_AIS if op == "AIS" else CLUSTER_TRUE
         n = max(1, site_count)
         return {"dt": dt * n, "report": rep * n, "total": (dt + rep) * n,
-                "unit_total": dt + rep, "category": "Cluster DT Opt", "site_count": n}
+                "unit_total": dt + rep, "category": f"Cluster DT Opt ({op})",
+                "site_count": n, "operator": op, "needs_review": False}
     if "pre dt" in text or "predrive" in text or "pre-dt" in text:
         dt, rep = PRE_DT
         return {"dt": dt, "report": rep, "total": dt + rep,
-                "unit_total": dt + rep, "category": "Pre-DT", "site_count": 1}
+                "unit_total": dt + rep, "category": "Pre-DT", "site_count": 1,
+                "operator": op, "needs_review": False}
     if "single site verification" in text or wt == "SSV":
-        n_layers = layers if layers else _parse_layers(item_dis) or 1
+        parsed = layers if layers else _parse_layers(item_dis)
+        n_layers = parsed if parsed else 1
         dt, rep, label = _ssv_tier(n_layers)
         return {"dt": dt, "report": rep, "total": dt + rep,
-                "unit_total": dt + rep, "category": f"SSV {label} layers", "site_count": 1}
-    # PAC fallback (no SSOA/Cluster keyword) → treat as Cluster
+                "unit_total": dt + rep, "category": f"SSV {label} layers",
+                "site_count": 1, "operator": op,
+                # layers unknown → defaulted to the cheapest tier; surface for review
+                "needs_review": not parsed,
+                **({"review_reason": "layer tier unknown — defaulted to 1-3"} if not parsed else {})}
+    # PAC fallback (no SSOA/Cluster keyword) → treat as Cluster (operator-aware)
     if wt == "PAC":
-        dt, rep = CLUSTER_TRUE
+        dt, rep = CLUSTER_AIS if op == "AIS" else CLUSTER_TRUE
         n = max(1, site_count)
         return {"dt": dt * n, "report": rep * n, "total": (dt + rep) * n,
-                "unit_total": dt + rep, "category": "Cluster DT Opt", "site_count": n}
-    return {"dt": 0, "report": 0, "total": 0, "unit_total": 0, "category": "—", "site_count": 1}
+                "unit_total": dt + rep, "category": f"Cluster DT Opt ({op})",
+                "site_count": n, "operator": op,
+                "needs_review": True, "review_reason": "PAC without Cluster/SSOA keyword — assumed Cluster"}
+    return {"dt": 0, "report": 0, "total": 0, "unit_total": 0, "category": "—",
+            "site_count": 1, "operator": op, "needs_review": False}
+

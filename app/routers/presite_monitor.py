@@ -1377,6 +1377,26 @@ async def my_sites(
     }
 
 
+async def _compute_income_for_tracking(db: AsyncSession, r: DtePresiteTracking) -> dict:
+    """Compute the live DTE income for a single tracking row.
+
+    Mirrors the PAC site-count / representative item_dis resolution used by the
+    bulk finance builder, so mark-paid freezes the exact same number Finance saw.
+    """
+    from app.services.dte_rates import compute_income
+    if (r.work_type or "").upper() == "PAC" and r.cluster_key:
+        crow = (await db.execute(
+            select(func.count(), func.min(ProjectPO.item_dis))
+            .where(ProjectPO.cluster_site == r.cluster_key)
+        )).one()
+        sc = int(crow[0]) or 1
+        idis = r.item_dis or crow[1]
+    else:
+        sc = 1
+        idis = r.item_dis
+    return compute_income(r.work_type, idis, r.layers, sc)
+
+
 async def _finance_payments_data(db: AsyncSession, status: str, month: str | None,
                                  dte_code: str | None, work_type: str | None) -> dict:
     """Shared builder for finance payment data (used by JSON view + Excel export)."""
@@ -1440,6 +1460,22 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             sc = 1
             idis = r.item_dis
         inc = compute_income(r.work_type, idis, r.layers, sc)
+        # Paid rows show the frozen snapshot captured at mark-paid time, not the
+        # live recomputation — so a later rate/cluster/item_dis change can't drift
+        # the reported "paid" total. Falls back to live for legacy rows paid
+        # before the snapshot columns existed.
+        if paid and r.dte_paid_amount is not None:
+            disp_total = float(r.dte_paid_amount)
+            disp_dt = float(r.dte_paid_income_dt) if r.dte_paid_income_dt is not None else inc["dt"]
+            disp_report = float(r.dte_paid_income_report) if r.dte_paid_income_report is not None else inc["report"]
+            disp_category = r.dte_paid_category or inc["category"]
+            disp_site_count = r.dte_paid_site_count or inc["site_count"]
+        else:
+            disp_total = inc["total"]
+            disp_dt = inc["dt"]
+            disp_report = inc["report"]
+            disp_category = inc["category"]
+            disp_site_count = inc["site_count"]
         appr_at = r.ace_approve_at or (r.check_at if r.check_result == "PASS" else None) or r.completed_at
         appr_by = r.ace_approve_by or r.check_by
         data.append({
@@ -1448,11 +1484,11 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             "work_type": r.work_type,
             "dte_code": r.assigned_dte_code,
             "dte_name": r.assigned_dte_name or name_by_code.get(r.assigned_dte_code, r.assigned_dte_code),
-            "category": inc["category"],
-            "site_count": inc["site_count"],
-            "income": inc["total"],
-            "income_dt": inc["dt"],
-            "income_report": inc["report"],
+            "category": disp_category,
+            "site_count": disp_site_count,
+            "income": disp_total,
+            "income_dt": disp_dt,
+            "income_report": disp_report,
             "current_stage": r.current_stage,
             "dt_done_date": (r.dt_done_at.date().isoformat() if r.dt_done_at else None),
             "month": ym,
@@ -1794,16 +1830,32 @@ async def mark_paid(
     )).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "Tracking row not found")
+    # Guard: only approved work is payable (cannot pay un-approved / unfinished sites)
+    if row.current_stage != STAGE_ACE_APPROVED:
+        raise HTTPException(
+            409, f"Cannot mark paid: stage is {row.current_stage}, must be {STAGE_ACE_APPROVED}")
+    # Guard: idempotency — never silently overwrite an existing payment
+    if row.dte_paid_at:
+        raise HTTPException(409, "Already marked paid; unmark first to re-pay")
+    # Freeze the computed income onto the row so the paid total can't drift later
+    inc = await _compute_income_for_tracking(db, row)
     now = datetime.now(timezone.utc)
     actor = payload.get("employee_code") or payload.get("sub")
     row.dte_paid_at = now
     row.dte_paid_by = actor
     row.dte_payment_ref = body.payment_ref
+    row.dte_paid_amount = inc["total"]
+    row.dte_paid_income_dt = inc["dt"]
+    row.dte_paid_income_report = inc["report"]
+    row.dte_paid_category = inc["category"]
+    row.dte_paid_site_count = inc["site_count"]
     _record_history(db, tracking_id=tracking_id, stage=row.current_stage, action="mark-paid",
                     actor_code=actor, actor_name=payload.get("name") or actor,
-                    notes=f"DTE payment marked paid{(' · ref ' + body.payment_ref) if body.payment_ref else ''}")
+                    notes=f"DTE payment marked paid · {inc['total']:.2f} THB ({inc['category']})"
+                          f"{(' · ref ' + body.payment_ref) if body.payment_ref else ''}")
     await db.commit()
-    return {"ok": True, "tracking_id": tracking_id, "paid": True, "dte_paid_at": _iso(now)}
+    return {"ok": True, "tracking_id": tracking_id, "paid": True, "dte_paid_at": _iso(now),
+            "amount": inc["total"], "category": inc["category"]}
 
 
 @router.post("/tracking/{tracking_id}/unmark-paid")
@@ -1823,6 +1875,11 @@ async def unmark_paid(
     row.dte_paid_at = None
     row.dte_paid_by = None
     row.dte_payment_ref = None
+    row.dte_paid_amount = None
+    row.dte_paid_income_dt = None
+    row.dte_paid_income_report = None
+    row.dte_paid_category = None
+    row.dte_paid_site_count = None
     actor = payload.get("employee_code") or payload.get("sub")
     _record_history(db, tracking_id=tracking_id, stage=row.current_stage, action="unmark-paid",
                     actor_code=actor, actor_name=payload.get("name") or actor, notes="DTE payment reverted")

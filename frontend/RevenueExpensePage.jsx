@@ -1,11 +1,52 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Wallet, LayoutDashboard, LineChart as LineChartIcon, BarChart3, TrendingUp,
   CalendarRange, Receipt, ClipboardList, GitCompare, Target, FileText, Settings,
-  Menu, X, LogOut, Sparkles, Activity,
+  Menu, X, LogOut, Sparkles, Activity, ScanLine,
 } from 'lucide-react'
+import { apiFetch } from './src/apiFetch.js'
+
+// Live feed: posted Payment Vouchers (scanned bills saved to Accounting) as
+// the bottom-up "Expense Actual". Additive banner — the hardcoded plan/actual
+// arrays below are historical; this pulls real posted expenses from the ledger.
+function ScannedBillsBanner() {
+  const [s, setS] = useState(null)
+  useEffect(() => {
+    let alive = true
+    apiFetch('/api/finance/accounting/summary')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (alive) setS(d) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+  if (!s || !(s.months && s.months.length)) return null
+  const fmtB = n => `฿${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14,
+      padding: '14px 18px', borderRadius: 16, marginBottom: 18,
+      border: '1px solid #bfdbfe', background: 'linear-gradient(135deg,#eff6ff,#f0fdf4)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ display: 'grid', placeItems: 'center', width: 38, height: 38, borderRadius: 12, background: '#2447d814', color: ACE_BLUE }}><ScanLine size={20} /></span>
+        <div>
+          <div style={{ fontSize: '.7rem', fontWeight: 850, letterSpacing: '.04em', color: '#64748b', textTransform: 'uppercase' }}>Expense Actual from Scanned Bills</div>
+          <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#020617' }}>{fmtB(s.total_expense_actual)}</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {s.months.slice(-6).map(m => (
+          <span key={m.month} style={{ padding: '4px 10px', borderRadius: 999, background: '#fff', border: '1px solid #e2e8f0', fontSize: '.72rem', fontWeight: 800, color: '#334155' }}>
+            {m.month}: {fmtB(m.expense_actual)}
+          </span>
+        ))}
+      </div>
+      <a href="/finance/accounting" style={{ marginLeft: 'auto', fontSize: '.78rem', fontWeight: 850, color: ACE_BLUE, textDecoration: 'underline', textUnderlineOffset: 3 }}>Open PV Ledger →</a>
+    </div>
+  )
+}
 
 const ACE_BLUE = '#2447d8'
 const ACE_RED = '#c73b32'
@@ -1354,6 +1395,7 @@ export default function RevenueExpensePage({ authenticatedUser = null, onLogout 
         <button type="button" style={styles.headerButton}>+ Add Transaction</button>
       </Header>
       <section style={styles.body}>
+        {(page === 'dashboard' || page === 'expense') && <ScannedBillsBanner />}
         {page === 'dashboard' && <Dashboard data={data} />}
         {page === 'executive' && <Executive data={data} />}
         {page === 'financial' && <FinancialReportPage subset={financialSubset} setSubset={setFinancialSubset} />}

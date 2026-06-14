@@ -144,6 +144,12 @@ export const ROUTE_DEFINITIONS = {
     roles: ROLES.FINANCE,
     component: 'BillReaderPage',
   },
+  '/finance/accounting': {
+    title: 'Accounting (PV Ledger)',
+    group: 'Finance',
+    roles: ROLES.FINANCE,
+    component: 'AccountingPage',
+  },
   '/project/rf-monitor': {
     title: 'RF Monitor — HWT2304',
     group: 'Project',

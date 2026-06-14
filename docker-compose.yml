@@ -48,6 +48,7 @@ services:
     volumes:
       - ./photos:/app/photos
       - ./reports:/app/reports
+      - ./voucher_files:/app/voucher_files   # เอกสารแนบใบสำคัญจ่าย (private — ไม่อยู่ใต้ /photos)
     depends_on:
       postgres:
         condition: service_healthy

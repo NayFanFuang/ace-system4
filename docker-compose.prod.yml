@@ -38,6 +38,7 @@ services:
       SMTP_TLS: ${SMTP_TLS:-false}
     volumes:
       - ./photos:/app/photos
+      - ./voucher_files:/app/voucher_files   # เอกสารแนบใบสำคัญจ่าย (private)
     depends_on:
       postgres:
         condition: service_healthy

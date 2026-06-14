@@ -39,6 +39,12 @@ ACTION_LABELS = {
     "data_quality_issue_detected": "Data quality issue detected",
     "data_quality_issue_resolved": "Data quality issue resolved",
     "data_quality_issue_ignored": "Data quality issue ignored",
+    "pv_created": "Payment voucher created",
+    "pv_approved": "Payment voucher approved",
+    "pv_paid": "Payment voucher paid",
+    "pv_reverted": "Payment voucher reverted to draft",
+    "pv_deleted": "Payment voucher deleted",
+    "pv_attachment_added": "Payment voucher attachment added",
 }
 
 

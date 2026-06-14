@@ -24,6 +24,7 @@ import PreSiteMonitorDtaPage from '../PreSiteMonitorDtaPage.jsx'
 import ReportUploadPage from '../ReportUploadPage.jsx'
 import DtePaymentsPage from '../DtePaymentsPage.jsx'
 import BillReaderPage from '../BillReaderPage.jsx'
+import AccountingPage from '../AccountingPage.jsx'
 import DailyWorklogPage from '../DailyWorklogPage.jsx'
 import MeetingRoomPage from '../MeetingRoomPage.jsx'
 import OfficeStorePage from '../OfficeStorePage.jsx'
@@ -88,6 +89,7 @@ const COMPONENTS = {
   ReportUploadPage,
   DtePaymentsPage,
   BillReaderPage,
+  AccountingPage,
   RevenueExpensePage,
   SystemMonitorPage,
   RawDataPage,

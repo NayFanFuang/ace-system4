@@ -2506,6 +2506,7 @@ async def project_po_collection_dashboard(
     by_owner: dict[str, dict] = {}
     by_vendor: dict[str, dict] = {}
     by_project: dict[str, dict] = {}
+    proj_roll: dict[str, dict] = {}    # ace_project_code → full collection rollup
     monthly: dict[str, dict] = {}      # "YYYY-MM" → {collected, dte_paid}
     rows_out: list[dict] = []
     aging_watch: list[dict] = []
@@ -2563,6 +2564,19 @@ async def project_po_collection_dashboard(
         _bump(by_vendor, (row.vendor or "HW").upper(), amt)
         _bump(by_project, (row.ace_project_code or "—").upper(), amt)
 
+        # Per-project collection rollup (for drill-down + PDF report)
+        pkey = (row.ace_project_code or "—").upper()
+        pr = proj_roll.setdefault(pkey, {k: 0.0 for k in (
+            "count", "total", "billed", "partial", "not_billed", "rejected",
+            "dte_paid", "dte_unpaid")})
+        pr["count"] += 1
+        pr["total"] += amt
+        pr[{"BILLED": "billed", "PARTIAL": "partial", "REJECTED": "rejected"}.get(b_state, "not_billed")] += amt
+        if p_state == "PAID":
+            pr["dte_paid"] += amt
+        elif p_state == "UNPAID":
+            pr["dte_unpaid"] += amt
+
         rec = po_to_dict(row)
         rec["billing_state"] = b_state
         rec["dte_pay_state"] = p_state
@@ -2607,15 +2621,19 @@ async def project_po_collection_dashboard(
         plan_stmt = plan_stmt.where(BillingPlan.vendor == vendor.upper())
     plan_rows = (await db.execute(plan_stmt)).scalars().all()
     plan_by_month: dict[str, float] = {}
-    for pr in plan_rows:
-        m = (pr.month or "").strip()
+    plan_by_project: dict[str, float] = {}
+    for plan in plan_rows:
+        m = (plan.month or "").strip()
         if not m:
             continue
         if mf and m < mf:
             continue
         if mt and m > mt:
             continue
-        plan_by_month[m] = plan_by_month.get(m, 0.0) + float(pr.planned_amount or 0)
+        amt_p = float(plan.planned_amount or 0)
+        plan_by_month[m] = plan_by_month.get(m, 0.0) + amt_p
+        pk = (plan.ace_project_code or "—").upper()
+        plan_by_project[pk] = plan_by_project.get(pk, 0.0) + amt_p
 
     all_months = sorted(set(monthly.keys()) | set(plan_by_month.keys()))
     monthly_out = [{
@@ -2626,6 +2644,31 @@ async def project_po_collection_dashboard(
     } for m in all_months]
     total_plan = round(sum(plan_by_month.values()), 2)
     plan_collection_rate = round(100.0 * summary["billed_value"] / total_plan, 1) if total_plan > 0 else 0.0
+
+    # Per-project rollup output (drill-down + PDF). Include projects that only
+    # have a plan target (no PO yet) so gaps are visible.
+    project_rollup = []
+    for pk in sorted(set(proj_roll.keys()) | set(plan_by_project.keys())):
+        r = proj_roll.get(pk, {k: 0.0 for k in (
+            "count", "total", "billed", "partial", "not_billed", "rejected", "dte_paid", "dte_unpaid")})
+        plan_p = plan_by_project.get(pk, 0.0)
+        collectable = r["total"] - r["rejected"]
+        project_rollup.append({
+            "ace_project_code": pk,
+            "count": int(r["count"]),
+            "total": round(r["total"], 2),
+            "billed": round(r["billed"], 2),
+            "partial": round(r["partial"], 2),
+            "outstanding": round(r["not_billed"] + r["partial"], 2),
+            "not_billed": round(r["not_billed"], 2),
+            "rejected": round(r["rejected"], 2),
+            "dte_paid": round(r["dte_paid"], 2),
+            "dte_unpaid": round(r["dte_unpaid"], 2),
+            "plan": round(plan_p, 2),
+            "collection_rate": round(100.0 * r["billed"] / collectable, 1) if collectable > 0 else 0.0,
+            "plan_rate": round(100.0 * r["billed"] / plan_p, 1) if plan_p > 0 else 0.0,
+        })
+    project_rollup.sort(key=lambda x: x["total"], reverse=True)
 
     def _flatten(bucket: dict) -> list[dict]:
         return sorted(
@@ -2648,6 +2691,7 @@ async def project_po_collection_dashboard(
         "by_owner": _flatten(by_owner),
         "by_vendor": _flatten(by_vendor),
         "by_project": _flatten(by_project),
+        "project_rollup": project_rollup,
         "monthly": monthly_out,
         "aging_watch": aging_watch[:60],
         "data": rows_out,

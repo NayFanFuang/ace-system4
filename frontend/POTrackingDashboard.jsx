@@ -8,11 +8,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Banknote, TrendingUp, Clock, CheckCircle2, AlertTriangle, RefreshCw,
-  Filter, FileSpreadsheet, Search, XCircle, Hourglass, CircleDollarSign,
-  GitBranch, Users, Building2, Layers, Wallet,
+  Filter, FileSpreadsheet, FileText, Search, XCircle, Hourglass, CircleDollarSign,
+  GitBranch, Users, Building2, Layers, Wallet, ChevronRight,
 } from 'lucide-react'
 import { apiFetch } from './src/apiFetch.js'
-import { exportExcel } from './src/exportUtils.js'
+import { exportExcel, exportPdf } from './src/exportUtils.js'
 
 const ACE_BLUE = '#2447d8'
 const PURPLE   = '#7c3aed'
@@ -29,6 +29,10 @@ function fmtBaht(n) {
 function fmtNum(n) {
   if (n == null) return '0'
   return Number(n).toLocaleString('en-US')
+}
+// ASCII money for PDF (jsPDF default font has no Thai glyphs / ฿ symbol)
+function fmtTHB(n) {
+  return 'THB ' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 function dateShort(iso) {
   if (!iso) return '—'
@@ -209,7 +213,8 @@ function BreakdownTable({ title, icon: Icon, tone, rows, keyLabel }) {
 }
 
 const EMPTY = {
-  summary: {}, by_status: [], by_phase: [], by_owner: [], by_vendor: [], by_project: [], aging_watch: [], data: [],
+  summary: {}, by_status: [], by_phase: [], by_owner: [], by_vendor: [], by_project: [],
+  project_rollup: [], monthly: [], aging_watch: [], data: [],
 }
 
 export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
@@ -256,6 +261,19 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
   useEffect(() => { reload() }, [reload])
 
   const s = d.summary || {}
+
+  // Project filter options — defaults + any project present in the data
+  const projectOptions = useMemo(() => {
+    const keys = new Set(['HWT2304', 'HWT2604'])
+    ;(d.project_rollup || []).forEach(p => { if (p.ace_project_code && p.ace_project_code !== '—') keys.add(p.ace_project_code) })
+    if (aceProject) keys.add(aceProject)
+    return Array.from(keys).sort().map(k => [k, k])
+  }, [d.project_rollup, aceProject])
+
+  function drillProject(code) {
+    setAceProject(code === '—' ? '' : code)
+    setTab('detail')
+  }
 
   // Client-side search across PO number / site / project
   const visibleRows = useMemo(() => {
@@ -317,6 +335,41 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
     })
   }
 
+  function scopeLabel() {
+    const parts = [
+      aceProject || 'All projects', workType || 'All types', vendor || 'All vendors',
+    ]
+    if (monthFrom || monthTo) parts.push(`${monthFrom || '…'} to ${monthTo || '…'}`)
+    return 'Scope: ' + parts.join(' / ')
+  }
+
+  function doExportPdf() {
+    const today = new Date().toISOString().slice(0, 10)
+    exportPdf({
+      title: 'PO Collection Report',
+      subtitle: `${scopeLabel()}  |  Plan ${fmtTHB(s.total_plan)} - Collected ${fmtTHB(s.billed_value)} (${s.collection_rate || 0}%) - Outstanding ${fmtTHB(s.outstanding_value)} - Rejected ${fmtTHB(s.rejected_value)}`,
+      filename: `PO_Collection_Report_${today}.pdf`,
+      landscape: true,
+      columns: [
+        { header: 'Project', dataKey: 'ace_project_code', width: 26 },
+        { header: 'POs', dataKey: 'count', width: 14 },
+        { header: 'Total', dataKey: 'f_total', width: 32 },
+        { header: 'Collected', dataKey: 'f_billed', width: 32 },
+        { header: 'Outstanding', dataKey: 'f_out', width: 32 },
+        { header: 'Rejected', dataKey: 'f_rej', width: 30 },
+        { header: 'Collect %', dataKey: 'collection_rate', width: 22 },
+        { header: 'Plan', dataKey: 'f_plan', width: 32 },
+        { header: 'vs Plan %', dataKey: 'plan_rate', width: 22 },
+      ],
+      rows: (d.project_rollup || []).map(r => ({
+        ...r,
+        f_total: fmtTHB(r.total), f_billed: fmtTHB(r.billed),
+        f_out: fmtTHB(r.outstanding), f_rej: fmtTHB(r.rejected), f_plan: fmtTHB(r.plan),
+      })),
+      signatures: [{ label: 'Prepared by (Finance)' }, { label: 'Approved by (Management)' }],
+    })
+  }
+
   function clearFilters() {
     setAceProject(''); setWorkType(''); setVendor(''); setOwnerRole(''); setBillingState(''); setPayState(''); setSearch('')
     setMonthFrom(''); setMonthTo('')
@@ -366,6 +419,10 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50">
                 <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> รีเฟรช
               </button>
+              <button onClick={doExportPdf}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-600 shadow-sm hover:bg-slate-50">
+                <FileText size={16} /> PDF Report
+              </button>
               <button onClick={doExport}
                 className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black text-white shadow-lg hover:opacity-90"
                 style={{ background: GREEN }}>
@@ -393,7 +450,7 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 text-xs font-black text-slate-500"><Filter size={14} /> ตัวกรอง</span>
               <Select value={aceProject} onChange={setAceProject} placeholder="ทุกโปรเจกต์"
-                options={[['HWT2304', 'HWT2304'], ['HWT2604', 'HWT2604']]} />
+                options={projectOptions} />
               <Select value={workType} onChange={setWorkType} placeholder="ทุกประเภท"
                 options={[['SSV', 'SSV'], ['PAC', 'PAC']]} />
               <Select value={vendor} onChange={setVendor} placeholder="ทุก Vendor"
@@ -425,7 +482,7 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
 
           {/* Tabs */}
           <div className="flex gap-2">
-            {[['overview', 'ภาพรวม'], ['detail', `รายการ PO (${visibleRows.length})`], ['aging', `ค้างนาน (${(d.aging_watch || []).length})`]].map(([k, label]) => (
+            {[['overview', 'ภาพรวม'], ['projects', `รายโปรเจกต์ (${(d.project_rollup || []).length})`], ['detail', `รายการ PO (${visibleRows.length})`], ['aging', `ค้างนาน (${(d.aging_watch || []).length})`]].map(([k, label]) => (
               <button key={k} onClick={() => setTab(k)}
                 className={`rounded-xl px-4 py-2 text-sm font-black transition ${tab === k ? 'bg-slate-900 text-white shadow' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
                 {label}
@@ -464,6 +521,61 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                 <BreakdownTable title="แยกตามโปรเจกต์" icon={Layers} tone={ACE_BLUE} rows={d.by_project} keyLabel="Project" />
               </section>
             </>
+          )}
+
+          {!loading && tab === 'projects' && (
+            <Card className="overflow-hidden">
+              <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
+                <Layers size={18} style={{ color: ACE_BLUE }} />
+                <h3 className="text-base font-black text-slate-950">สรุปการเก็บเงินรายโปรเจกต์</h3>
+                <span className="text-xs font-bold text-slate-400">— คลิกแถวเพื่อเจาะดูรายการ PO</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full" style={{ fontSize: '.8rem' }}>
+                  <thead>
+                    <tr className="bg-slate-50 text-left text-[.6rem] font-black uppercase text-slate-500">
+                      <th className="px-4 py-3">โปรเจกต์</th>
+                      <th className="px-4 py-3 text-center">PO</th>
+                      <th className="px-4 py-3 text-right">มูลค่ารวม</th>
+                      <th className="px-4 py-3 text-right">เก็บแล้ว</th>
+                      <th className="px-4 py-3 text-right">ค้างเก็บ</th>
+                      <th className="px-4 py-3 text-right">Reject</th>
+                      <th className="px-4 py-3">% เก็บได้</th>
+                      <th className="px-4 py-3 text-right">เป้า (Plan)</th>
+                      <th className="px-4 py-3 text-center">vs เป้า</th>
+                      <th className="px-4 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(d.project_rollup || []).map(r => (
+                      <tr key={r.ace_project_code} onClick={() => drillProject(r.ace_project_code)}
+                        className="cursor-pointer border-t border-slate-50 hover:bg-indigo-50/40">
+                        <td className="px-4 py-3 font-black text-slate-800">{r.ace_project_code}</td>
+                        <td className="px-4 py-3 text-center font-bold text-slate-500">{r.count}</td>
+                        <td className="px-4 py-3 text-right font-black text-slate-900">{fmtBaht(r.total)}</td>
+                        <td className="px-4 py-3 text-right font-bold" style={{ color: GREEN }}>{fmtBaht(r.billed)}</td>
+                        <td className="px-4 py-3 text-right font-bold" style={{ color: AMBER }}>{fmtBaht(r.outstanding)}</td>
+                        <td className="px-4 py-3 text-right font-bold" style={{ color: r.rejected ? RED : '#cbd5e1' }}>{r.rejected ? fmtBaht(r.rejected) : '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-20 overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, r.collection_rate)}%`, background: r.collection_rate >= 80 ? GREEN : r.collection_rate >= 50 ? AMBER : RED }} />
+                            </div>
+                            <span className="text-xs font-black text-slate-600">{r.collection_rate}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-500">{r.plan ? fmtBaht(r.plan) : '—'}</td>
+                        <td className="px-4 py-3 text-center font-black" style={{ color: !r.plan ? '#cbd5e1' : r.plan_rate >= 80 ? GREEN : r.plan_rate >= 50 ? AMBER : RED }}>{r.plan ? `${r.plan_rate}%` : '—'}</td>
+                        <td className="px-4 py-3 text-right text-slate-300"><ChevronRight size={16} /></td>
+                      </tr>
+                    ))}
+                    {(d.project_rollup || []).length === 0 && (
+                      <tr><td colSpan={10} className="px-4 py-12 text-center text-sm font-bold text-slate-400">ไม่มีข้อมูลโปรเจกต์</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           )}
 
           {!loading && tab === 'detail' && (

@@ -1,9 +1,14 @@
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (DateTime, ForeignKey, Integer, Numeric, String, Text,
+                        UniqueConstraint, func)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+# จำนวนเงินใช้ Numeric(18,2) (Decimal) เสมอ — ห้ามใช้ Float ในงานบัญชี (rounding drift)
+Money = Numeric(18, 2)
 
 
 class PaymentVoucher(Base):
@@ -14,24 +19,34 @@ class PaymentVoucher(Base):
     จริง (Actual Expense) ป้อนเข้าหน้า Revenue & Expense ได้
 
     วงจรสถานะ:  DRAFT (ร่าง) → APPROVED (อนุมัติ) → PAID (จ่ายแล้ว)
+
+    เลขเอกสาร: doc_no เป็น running number ที่ระบบออกให้ (PV-YYYY-0001) การันตี unique
+               ส่วน pv_no เป็นเลขอ้างอิงจากฟอร์ม/ไฟล์เดิม (อาจซ้ำ/ว่างได้)
     """
     __tablename__ = "payment_vouchers"
+    __table_args__ = (
+        UniqueConstraint("doc_no", name="uq_payment_vouchers_doc_no"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    pv_no: Mapped[str] = mapped_column(String(60), index=True, default="")
+    doc_no: Mapped[str] = mapped_column(String(30), index=True, default="")     # running no. ของระบบ
+    doc_year: Mapped[str] = mapped_column(String(4), index=True, default="")
+    doc_seq: Mapped[int] = mapped_column(Integer, default=0)
+    pv_no: Mapped[str] = mapped_column(String(60), index=True, default="")      # เลขอ้างอิงจากฟอร์ม
     item: Mapped[str] = mapped_column(String(30), default="")
-    pv_date: Mapped[str] = mapped_column(String(30), default="")            # DD-Mon-YYYY ตามฟอร์ม
-    period_month: Mapped[str] = mapped_column(String(7), index=True, default="")  # YYYY-MM (ใช้สรุปรายเดือน)
+    pv_date: Mapped[str] = mapped_column(String(30), default="")                # DD-Mon-YYYY ตามฟอร์ม
+    period_month: Mapped[str] = mapped_column(String(7), index=True, default="")  # YYYY-MM (สรุปรายเดือน)
     bill_type: Mapped[str] = mapped_column(String(30), index=True, default="")
     vendor: Mapped[str] = mapped_column(String(255), default="")
     project: Mapped[str] = mapped_column(String(255), default="")
-    requester: Mapped[str] = mapped_column(String(255), default="")         # Name (ผู้ขอเบิก)
-    issued_by: Mapped[str] = mapped_column(String(255), default="")         # Issued (ผู้จัดทำ)
+    requester: Mapped[str] = mapped_column(String(255), default="")            # Name (ผู้ขอเบิก)
+    issued_by: Mapped[str] = mapped_column(String(255), default="")            # Issued (ผู้จัดทำ)
     status: Mapped[str] = mapped_column(String(20), index=True, default="DRAFT")
-    amount_total: Mapped[float] = mapped_column(Float, default=0.0)
-    vat_total: Mapped[float] = mapped_column(Float, default=0.0)
-    wht_total: Mapped[float] = mapped_column(Float, default=0.0)
-    net_total: Mapped[float] = mapped_column(Float, default=0.0)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True, default="")  # กันบิลซ้ำ
+    amount_total: Mapped[Decimal] = mapped_column(Money, default=0)            # ยอดก่อน VAT (ค่าใช้จ่ายจริง)
+    vat_total: Mapped[Decimal] = mapped_column(Money, default=0)               # VAT 7% (ภาษีซื้อ)
+    wht_total: Mapped[Decimal] = mapped_column(Money, default=0)               # หัก ณ ที่จ่าย
+    net_total: Mapped[Decimal] = mapped_column(Money, default=0)               # ยอดจ่ายสุทธิ
     note: Mapped[str] = mapped_column(Text, default="")
     source_filename: Mapped[str] = mapped_column(String(255), default="")
     created_by: Mapped[str] = mapped_column(String(30), index=True, default="")
@@ -58,9 +73,9 @@ class PaymentVoucherLine(Base):
     identifier: Mapped[str] = mapped_column(String(60), default="")
     period: Mapped[str] = mapped_column(String(60), default="")
     description: Mapped[str] = mapped_column(Text, default="")
-    amount: Mapped[float] = mapped_column(Float, default=0.0)
-    vat: Mapped[float] = mapped_column(Float, default=0.0)
-    wht: Mapped[float] = mapped_column(Float, default=0.0)
-    net: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[Decimal] = mapped_column(Money, default=0)
+    vat: Mapped[Decimal] = mapped_column(Money, default=0)
+    wht: Mapped[Decimal] = mapped_column(Money, default=0)
+    net: Mapped[Decimal] = mapped_column(Money, default=0)
 
     voucher: Mapped["PaymentVoucher"] = relationship(back_populates="lines")

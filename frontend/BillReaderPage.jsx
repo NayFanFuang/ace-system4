@@ -206,11 +206,12 @@ export default function BillReaderPage({ authenticatedUser, onLogout }) {
     finally { setGenerating(false) }
   }
 
-  async function saveToAccounting() {
+  async function saveToAccounting(allowDuplicate = false) {
     setSaving(true); setError(''); setSavedMsg('')
     try {
       const body = {
         vendor, header: header || {}, bill_type: billType, filename: pvFilename(),
+        allow_duplicate: allowDuplicate,
         lines: rows.map(r => ({
           identifier: r.identifier, period: r.period, amount: r.amount, vat: r.vat,
           vendor, desc: buildDesc(r, profile, vendor), ocr: r._ocr || {},
@@ -218,8 +219,15 @@ export default function BillReaderPage({ authenticatedUser, onLogout }) {
       }
       const res = await apiFetch('/api/finance/accounting/vouchers', { method: 'POST', body: JSON.stringify(body) })
       const data = await readJsonSafe(res)
-      if (!res.ok) throw new Error(httpErr(res, data, 'Failed to save to accounting'))
-      setSavedMsg(`Saved to accounting — ${data.pv_no || 'PV'} (status: Draft). View it in the PV Ledger.`)
+      // duplicate guard: backend ตอบ 409 + detail.code === 'duplicate' ให้ยืนยันก่อนบันทึกซ้ำ
+      const detail = data && data.detail
+      if (res.status === 409 && detail && typeof detail === 'object' && detail.code === 'duplicate') {
+        setSaving(false)
+        if (window.confirm(`${detail.message}`)) { return saveToAccounting(true) }
+        return
+      }
+      if (!res.ok) throw new Error(typeof detail === 'string' ? detail : httpErr(res, data, 'Failed to save to accounting'))
+      setSavedMsg(`Saved to accounting — ${data.doc_no || data.pv_no || 'PV'} (status: Draft). View it in the PV Ledger.`)
       refreshStats()
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
@@ -413,7 +421,7 @@ export default function BillReaderPage({ authenticatedUser, onLogout }) {
                 )}
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   <div className="mr-auto text-sm font-semibold text-slate-400">WHT {pct(whtRate)} and Net are computed automatically per bill type · change "Bill type" above to adjust the formula/form</div>
-                  <button type="button" onClick={saveToAccounting} disabled={saving || rows.length === 0}
+                  <button type="button" onClick={() => saveToAccounting()} disabled={saving || rows.length === 0}
                     className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black text-white shadow-sm transition disabled:opacity-50" style={{ background: ACE_GREEN }}>
                     {saving ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />Saving…</> : <><Save size={18} />Save to Accounting</>}
                   </button>

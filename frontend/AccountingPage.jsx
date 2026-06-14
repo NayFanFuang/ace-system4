@@ -268,7 +268,7 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
               <StatCard icon={FileText} label="Draft" value={counts.DRAFT} sub="awaiting approval" color="#64748b" />
               <StatCard icon={CheckCircle2} label="Approved" value={counts.APPROVED} sub="ready to pay" color={ACE_BLUE} />
               <StatCard icon={Wallet} label="Paid" value={counts.PAID} sub="completed" color="#0e9f6e" />
-              <StatCard icon={Coins} label="Expense Actual (posted)" value={`฿${fmt(summary?.total_expense_actual)}`} sub="approved + paid, incl. VAT" color={ACE_RED} />
+              <StatCard icon={Coins} label="Expense Actual (posted)" value={`฿${fmt(summary?.total_expense_actual)}`} sub="approved + paid · base, excl. input VAT" color={ACE_RED} />
             </div>
 
             {/* Monthly expense actual feed */}
@@ -280,7 +280,7 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                     <div key={m.month} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                       <div className="text-xs font-black uppercase tracking-wide text-slate-400">{m.month}</div>
                       <div className="mt-1 text-lg font-black text-slate-900">฿{fmt(m.expense_actual)}</div>
-                      <div className="text-xs font-bold text-slate-400">{m.count} voucher(s) · net ฿{fmt(m.net_total)}</div>
+                      <div className="text-xs font-bold text-slate-400">{m.count} voucher(s) · VAT ฿{fmt(m.input_vat)} · paid ฿{fmt(m.net_paid)}</div>
                     </div>
                   ))}
                 </div>
@@ -311,7 +311,7 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                 <table className="w-full min-w-[920px] border-collapse text-sm">
                   <thead>
                     <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-500">
-                      <th className="px-4 py-3">PV No.</th>
+                      <th className="px-4 py-3">Doc No.</th>
                       <th className="px-4 py-3">Vendor / Project</th>
                       <th className="px-4 py-3">Month</th>
                       <th className="px-4 py-3 text-right">Amount</th>
@@ -329,8 +329,8 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                     ) : filtered.map(v => (
                       <tr key={v.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3">
-                          <button type="button" onClick={() => openDetail(v.id)} className="font-black text-blue-700 hover:underline">{v.pv_no || `PV-${v.id}`}</button>
-                          {v.item && <span className="ml-1 text-xs font-bold text-slate-400">·Item {v.item}</span>}
+                          <button type="button" onClick={() => openDetail(v.id)} className="font-black text-blue-700 hover:underline">{v.doc_no || `PV-${v.id}`}</button>
+                          <div className="text-xs font-semibold text-slate-400">{v.pv_no ? `Ref ${v.pv_no}` : ''}{v.item ? ` · Item ${v.item}` : ''}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-800">{v.vendor || '—'}</div>
@@ -359,14 +359,14 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-xs font-black uppercase tracking-wide text-slate-400">Payment Voucher</div>
-                <div className="text-2xl font-black text-slate-900">{detail.pv_no || `PV-${detail.id}`}</div>
+                <div className="text-2xl font-black text-slate-900">{detail.doc_no || `PV-${detail.id}`}</div>
                 <div className="mt-1"><StatusBadge status={detail.status} /></div>
               </div>
               <button type="button" onClick={() => setDetail(null)}><X size={20} className="text-slate-400 hover:text-slate-700" /></button>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              {[['Vendor', detail.vendor], ['Project', detail.project], ['Item', detail.item], ['Month', detail.period_month], ['Date', detail.pv_date], ['Requester', detail.requester], ['Issued by', detail.issued_by], ['Source', detail.source_filename]].map(([k, val]) => (
+              {[['Ref No.', detail.pv_no], ['Vendor', detail.vendor], ['Project', detail.project], ['Item', detail.item], ['Month', detail.period_month], ['Date', detail.pv_date], ['Requester', detail.requester], ['Issued by', detail.issued_by], ['Source', detail.source_filename]].map(([k, val]) => (
                 <div key={k}>
                   <div className="text-xs font-black uppercase tracking-wide text-slate-400">{k}</div>
                   <div className="font-bold text-slate-800">{val || '—'}</div>

@@ -12,14 +12,14 @@ from __future__ import annotations
 
 import io
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import requireRole
-from app.services import accounting, bill_reader, bill_memory
+from app.services import accounting, audit_service, bill_reader, bill_memory
 
 router = APIRouter(prefix="/api/finance", tags=["Finance"])
 
@@ -34,6 +34,7 @@ require_finance_user = requireRole(FINANCE_ROLES)
 APPROVE_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "DIRECTOR", "ACCOUNTING"}
 PAY_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "ACCOUNTING"}
 _ACTION_ROLES = {"approve": APPROVE_ROLES, "pay": PAY_ROLES, "revert": APPROVE_ROLES}
+_ACTION_AUDIT = {"approve": "pv_approved", "pay": "pv_paid", "revert": "pv_reverted"}
 
 MAX_PDF_MB = 25
 
@@ -145,6 +146,7 @@ class VoucherCreate(BaseModel):
     vendor: str = ""
     bill_type: str = ""
     filename: str = ""
+    allow_duplicate: bool = False     # True = ยืนยันบันทึกแม้เจอบิลซ้ำ
 
 
 class VoucherTransition(BaseModel):
@@ -159,6 +161,7 @@ def _actor(payload: dict) -> str:
 @router.post("/accounting/vouchers")
 async def create_voucher(
     body: VoucherCreate,
+    request: Request,
     payload: dict = Depends(require_finance_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -166,10 +169,27 @@ async def create_voucher(
     lines = [l.model_dump() for l in body.lines]
     if not lines:
         raise HTTPException(400, "ไม่มีรายการสำหรับบันทึกเข้าระบบบัญชี")
+
+    # กันบิลซ้ำ (กันบันทึก/จ่ายซ้ำ) — เตือนก่อน เว้นแต่ผู้ใช้ยืนยัน allow_duplicate
+    if not body.allow_duplicate:
+        chash = accounting.content_hash(
+            vendor=body.vendor, bill_type=body.bill_type or "", lines=lines)
+        dup = await accounting.find_duplicate(db, chash)
+        if dup:
+            raise HTTPException(409, {
+                "code": "duplicate",
+                "message": f"พบบิลที่เนื้อหาเหมือนกันถูกบันทึกแล้ว: {dup.doc_no} "
+                           f"(สถานะ {accounting.STATUS_LABEL_TH.get(dup.status, dup.status)}) "
+                           f"— ยืนยันเพื่อบันทึกซ้ำ",
+                "duplicate_doc_no": dup.doc_no, "duplicate_id": dup.id,
+            })
+
     pv = await accounting.create_voucher(
         db, lines=lines, header=body.header or {}, vendor=body.vendor,
         bill_type=body.bill_type or "", filename=body.filename or "",
         created_by=_actor(payload))
+    # serialize ทันทีก่อน commit อื่น ๆ (commit จะ expire attribute ของ pv)
+    result = accounting.serialize(pv, with_lines=True)
     # เก็บ correction ไว้เรียนรู้ด้วย (เหมือนตอน export) — ไม่ให้ล้มถ้าพลาด
     try:
         await bill_memory.save_corrections(
@@ -177,7 +197,16 @@ async def create_voucher(
             filename=body.filename or "", created_by=_actor(payload))
     except Exception:
         pass
-    return accounting.serialize(pv, with_lines=True)
+    try:
+        await audit_service.write_audit_log(
+            db, action="pv_created", entity_type="payment_voucher", entity_id=result["id"],
+            payload=payload, request=request, source="FINANCE",
+            new_value={"doc_no": result["doc_no"], "vendor": result["vendor"],
+                       "net_total": result["net_total"], "status": result["status"]})
+        await db.commit()
+    except Exception:
+        await db.rollback()
+    return result
 
 
 @router.get("/accounting/vouchers")
@@ -216,6 +245,7 @@ async def get_voucher(
 async def transition_voucher(
     voucher_id: int,
     body: VoucherTransition,
+    request: Request,
     payload: dict = Depends(require_finance_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -228,28 +258,51 @@ async def transition_voucher(
     pv = await accounting.get_voucher(db, voucher_id)
     if not pv:
         raise HTTPException(404, "ไม่พบใบสำคัญจ่าย")
+    old_status = pv.status
     try:
         pv = await accounting.transition(
             db, pv, action=body.action, actor=_actor(payload),
             payment_ref=body.payment_ref or "")
     except ValueError as e:
         raise HTTPException(409, str(e))
-    return accounting.serialize(pv, with_lines=True)
+    # serialize ก่อน commit ของ audit (กัน attribute expire ใต้ async)
+    result = accounting.serialize(pv, with_lines=True)
+    try:
+        await audit_service.write_audit_log(
+            db, action=_ACTION_AUDIT.get(body.action, "pv_updated"),
+            entity_type="payment_voucher", entity_id=result["id"], payload=payload,
+            request=request, source="FINANCE",
+            old_value={"status": old_status}, new_value={"status": result["status"]},
+            changed_fields=["status"])
+        await db.commit()
+    except Exception:
+        await db.rollback()
+    return result
 
 
 @router.delete("/accounting/vouchers/{voucher_id}")
 async def delete_voucher(
     voucher_id: int,
+    request: Request,
     payload: dict = Depends(require_finance_user),
     db: AsyncSession = Depends(get_db),
 ):
     pv = await accounting.get_voucher(db, voucher_id)
     if not pv:
         raise HTTPException(404, "ไม่พบใบสำคัญจ่าย")
+    doc_no = pv.doc_no
     try:
         await accounting.delete_voucher(db, pv)
     except ValueError as e:
         raise HTTPException(409, str(e))
+    try:
+        await audit_service.write_audit_log(
+            db, action="pv_deleted", entity_type="payment_voucher", entity_id=voucher_id,
+            payload=payload, request=request, source="FINANCE",
+            old_value={"doc_no": doc_no})
+        await db.commit()
+    except Exception:
+        await db.rollback()
     return {"ok": True}
 
 

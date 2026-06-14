@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import requireRole
-from app.services import bill_reader, bill_memory
+from app.services import accounting, bill_reader, bill_memory
 
 router = APIRouter(prefix="/api/finance", tags=["Finance"])
 
@@ -29,6 +29,11 @@ FINANCE_ROLES = {
     "HR_ADMIN", "DIRECTOR", "ACCOUNTING",
 }
 require_finance_user = requireRole(FINANCE_ROLES)
+
+# สิทธิ์เปลี่ยนสถานะใบสำคัญจ่าย: อนุมัติ = ผู้บริหาร/บัญชี, จ่าย = บัญชีเท่านั้น
+APPROVE_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "DIRECTOR", "ACCOUNTING"}
+PAY_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "ACCOUNTING"}
+_ACTION_ROLES = {"approve": APPROVE_ROLES, "pay": PAY_ROLES, "revert": APPROVE_ROLES}
 
 MAX_PDF_MB = 25
 
@@ -122,6 +127,155 @@ async def bill_reader_export(
     except Exception:
         pass  # การเก็บเรียนรู้ล้มเหลว ไม่ควรทำให้ดาวน์โหลดล้ม
     safe = (body.filename or "PV").replace("/", "-").replace("\\", "-")
+    return StreamingResponse(
+        io.BytesIO(xls),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{safe}.xlsx"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Accounting — บันทึกบิลที่ scan แล้วเข้าระบบบัญชี (Payment Voucher ledger)
+#   DRAFT (ร่าง) → APPROVED (อนุมัติ) → PAID (จ่ายแล้ว)
+# ---------------------------------------------------------------------------
+
+class VoucherCreate(BaseModel):
+    lines: list[BillLineIn] = Field(default_factory=list)
+    header: dict = Field(default_factory=dict)
+    vendor: str = ""
+    bill_type: str = ""
+    filename: str = ""
+
+
+class VoucherTransition(BaseModel):
+    action: str                       # approve | pay | revert
+    payment_ref: str = ""
+
+
+def _actor(payload: dict) -> str:
+    return payload.get("employee_code") or payload.get("sub") or ""
+
+
+@router.post("/accounting/vouchers")
+async def create_voucher(
+    body: VoucherCreate,
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """บันทึกรายการบิล (ที่ตรวจ/แก้แล้ว) เข้าระบบบัญชีเป็นใบสำคัญจ่ายสถานะ DRAFT"""
+    lines = [l.model_dump() for l in body.lines]
+    if not lines:
+        raise HTTPException(400, "ไม่มีรายการสำหรับบันทึกเข้าระบบบัญชี")
+    pv = await accounting.create_voucher(
+        db, lines=lines, header=body.header or {}, vendor=body.vendor,
+        bill_type=body.bill_type or "", filename=body.filename or "",
+        created_by=_actor(payload))
+    # เก็บ correction ไว้เรียนรู้ด้วย (เหมือนตอน export) — ไม่ให้ล้มถ้าพลาด
+    try:
+        await bill_memory.save_corrections(
+            db, lines=lines, vendor=body.vendor, bill_type=body.bill_type or "",
+            filename=body.filename or "", created_by=_actor(payload))
+    except Exception:
+        pass
+    return accounting.serialize(pv, with_lines=True)
+
+
+@router.get("/accounting/vouchers")
+async def list_vouchers(
+    status: str = "", month: str = "", bill_type: str = "", q: str = "",
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """รายการใบสำคัญจ่าย (กรองตามสถานะ/เดือน/ชนิดบิล/คำค้น)"""
+    return {"vouchers": await accounting.list_vouchers(
+        db, status=status, month=month, bill_type=bill_type, q=q)}
+
+
+@router.get("/accounting/summary")
+async def accounting_summary(
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """สรุปค่าใช้จ่ายจริงรายเดือน + จำนวนตามสถานะ (ป้อนหน้า Revenue & Expense)"""
+    return await accounting.monthly_summary(db)
+
+
+@router.get("/accounting/vouchers/{voucher_id}")
+async def get_voucher(
+    voucher_id: int,
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    pv = await accounting.get_voucher(db, voucher_id)
+    if not pv:
+        raise HTTPException(404, "ไม่พบใบสำคัญจ่าย")
+    return accounting.serialize(pv, with_lines=True)
+
+
+@router.post("/accounting/vouchers/{voucher_id}/transition")
+async def transition_voucher(
+    voucher_id: int,
+    body: VoucherTransition,
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """เปลี่ยนสถานะใบสำคัญจ่าย: approve (อนุมัติ) / pay (จ่าย) / revert (ดึงกลับ)"""
+    allowed = _ACTION_ROLES.get(body.action)
+    if allowed is None:
+        raise HTTPException(400, f"ไม่รู้จักการกระทำ '{body.action}'")
+    if payload.get("role") not in allowed:
+        raise HTTPException(403, "ไม่มีสิทธิ์เปลี่ยนสถานะนี้")
+    pv = await accounting.get_voucher(db, voucher_id)
+    if not pv:
+        raise HTTPException(404, "ไม่พบใบสำคัญจ่าย")
+    try:
+        pv = await accounting.transition(
+            db, pv, action=body.action, actor=_actor(payload),
+            payment_ref=body.payment_ref or "")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return accounting.serialize(pv, with_lines=True)
+
+
+@router.delete("/accounting/vouchers/{voucher_id}")
+async def delete_voucher(
+    voucher_id: int,
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    pv = await accounting.get_voucher(db, voucher_id)
+    if not pv:
+        raise HTTPException(404, "ไม่พบใบสำคัญจ่าย")
+    try:
+        await accounting.delete_voucher(db, pv)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True}
+
+
+@router.get("/accounting/vouchers/{voucher_id}/export")
+async def export_voucher(
+    voucher_id: int,
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """ดาวน์โหลดฟอร์ม Excel PV ของใบสำคัญจ่ายที่บันทึกไว้แล้ว"""
+    pv = await accounting.get_voucher(db, voucher_id)
+    if not pv:
+        raise HTTPException(404, "ไม่พบใบสำคัญจ่าย")
+    header = {
+        "pv_no": pv.pv_no, "item": pv.item, "date": pv.pv_date,
+        "project": pv.project, "name": pv.requester, "issued": pv.issued_by,
+    }
+    lines = [{
+        "identifier": l.identifier, "period": l.period, "desc": l.description,
+        "amount": l.amount, "vat": l.vat, "vendor": pv.vendor,
+    } for l in pv.lines]
+    try:
+        xls = bill_reader.build_pv_excel(lines, header, pv.vendor, pv.bill_type or None)
+    except Exception as e:
+        raise HTTPException(500, f"สร้าง PV ไม่สำเร็จ: {e}")
+    safe = (pv.pv_no or f"PV-{pv.id}").replace("/", "-").replace("\\", "-")
     return StreamingResponse(
         io.BytesIO(xls),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -22,6 +22,7 @@ from app.models.worklog import DailyWorkLog  # noqa: F401 — registers table
 from app.models.bill_correction import BillCorrection  # noqa: F401 — registers table
 from app.models.data_import import DataImport  # noqa: F401 — registers table
 from app.models.billing_plan import BillingPlan  # noqa: F401 — registers table
+from app.models.payment_voucher import PaymentVoucher, PaymentVoucherLine  # noqa: F401 — registers tables
 from app.routers.auth import router as auth_router, seed_auth_users
 from app.routers.clock import router as clock_router, seed_clock_sites
 from app.routers.employees import router as employee_router, seed_employee_database, seed_project_operations

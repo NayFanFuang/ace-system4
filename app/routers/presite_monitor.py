@@ -1501,8 +1501,14 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             "dte_paid_at": _iso(r.dte_paid_at),
             "dte_paid_by": r.dte_paid_by,
             "dte_payment_ref": r.dte_payment_ref,
-            # payable = approved & report uploaded & not yet paid (ready to pay)
-            "payable": (r.current_stage == STAGE_ACE_APPROVED and not paid),
+            # payable = approved & not paid & (report uploaded when a Report Prep
+            # component is owed). PAC (Cluster/SSOA) earns DT only — no report
+            # component, log-file checked by DTA — so it needs no .rar to pay.
+            "payable": (
+                r.current_stage == STAGE_ACE_APPROVED
+                and not paid
+                and (bool(r.report_file_path) or (inc["report"] or 0) <= 0)
+            ),
         })
 
     # By-DTE summary
@@ -1839,6 +1845,11 @@ async def mark_paid(
         raise HTTPException(409, "Already marked paid; unmark first to re-pay")
     # Freeze the computed income onto the row so the paid total can't drift later
     inc = await _compute_income_for_tracking(db, row)
+    # Guard: a report-bearing item (SSV/Pre-DT, report component > 0) must have its
+    # report uploaded before payment. PAC earns DT only (log file checked by DTA)
+    # so it has no report requirement.
+    if (inc["report"] or 0) > 0 and not row.report_file_path:
+        raise HTTPException(409, "Cannot mark paid: report not uploaded for a report-bearing item")
     now = datetime.now(timezone.utc)
     actor = payload.get("employee_code") or payload.get("sub")
     row.dte_paid_at = now

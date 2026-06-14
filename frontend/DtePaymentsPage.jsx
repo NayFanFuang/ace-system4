@@ -389,7 +389,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                           <td className="px-4 py-3 text-right">
                             {r.paid
                               ? <button disabled={busyId === r.tracking_id} onClick={() => unmarkPaid(r.tracking_id)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 hover:bg-slate-50">Unmark</button>
-                              : <button disabled={busyId === r.tracking_id} onClick={() => markPaid(r.tracking_id)} className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90" style={{ background: GREEN }}>{busyId === r.tracking_id ? '…' : 'Mark Paid'}</button>}
+                              : <button disabled={busyId === r.tracking_id || !r.payable} onClick={() => markPaid(r.tracking_id)} title={!r.payable ? 'Not ready: needs ACE approval (and report upload for SSV/Pre-DT)' : ''} className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: GREEN }}>{busyId === r.tracking_id ? '…' : 'Mark Paid'}</button>}
                           </td>
                         </tr>
                       )

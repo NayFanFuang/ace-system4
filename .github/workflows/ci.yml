@@ -29,4 +29,5 @@ jobs:
 
       - name: Run accounting test suite
         # อื่น ๆ ใน tests/ เป็น template ที่ยังไม่มี fixture — รันเฉพาะชุดที่พร้อม
-        run: pytest tests/test_accounting.py -v --asyncio-mode=auto
+        # ใช้ `python -m pytest` เพื่อให้ repo root อยู่บน sys.path (import app ได้)
+        run: python -m pytest tests/test_accounting.py -v --asyncio-mode=auto

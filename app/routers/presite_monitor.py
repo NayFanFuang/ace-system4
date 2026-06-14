@@ -1535,8 +1535,6 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
         appr_at = r.ace_approve_at or (r.check_at if r.check_result == "PASS" else None) or r.completed_at
         appr_by = r.ace_approve_by or r.check_by
         cyc, pay_date = _cycle_for(appr_at)
-        if cycle and cyc != cycle:
-            continue
         data.append({
             "tracking_id": r.id,
             "site_code": r.cluster_key or r.site_code,
@@ -1575,40 +1573,9 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             ),
         })
 
-    # By-DTE summary
-    by_dte: dict[str, dict] = {}
-    for d in data:
-        code = d["dte_code"] or "—"
-        b = by_dte.setdefault(code, {
-            "dte_code": code, "dte_name": d["dte_name"], "sites": 0,
-            "total": 0.0, "paid": 0.0, "unpaid": 0.0, "payable": 0.0,
-        })
-        b["sites"] += 1
-        b["total"] += d["income"]
-        if d["paid"]:
-            b["paid"] += d["income"]
-        else:
-            b["unpaid"] += d["income"]
-        if d["payable"]:
-            b["payable"] += d["income"]
-    by_dte_list = sorted(by_dte.values(), key=lambda x: x["unpaid"], reverse=True)
-
-    # Monthly rollup (paid vs unpaid across all DTEs) — for charts
-    months: dict[str, dict] = {}
-    for d in data:
-        m = d.get("month")
-        if not m:
-            continue
-        b = months.setdefault(m, {"month": m, "sites": 0, "total": 0.0, "paid": 0.0, "unpaid": 0.0})
-        b["sites"] += 1
-        b["total"] += d["income"]
-        if d["paid"]:
-            b["paid"] += d["income"]
-        else:
-            b["unpaid"] += d["income"]
-    monthly = sorted(months.values(), key=lambda x: x["month"])
-
-    # Pay-cycle rollup (Round 1 / Round 2 per month) — drives the batch-pay UI
+    # Pay-cycle rollup (Round 1 / Round 2 per month) — drives the batch-pay UI.
+    # Built from the FULL set (before the cycle filter) so the cycle cards stay
+    # visible as a navigator even while the table is narrowed to one round.
     cycles: dict[str, dict] = {}
     for d in data:
         ck = d.get("cycle")
@@ -1627,15 +1594,51 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
             b["payable"] += d["income"]
     by_cycle = sorted(cycles.values(), key=lambda x: x["cycle"], reverse=True)
 
+    # Cycle filter narrows the table + per-DTE/monthly/totals (but not by_cycle).
+    view = [d for d in data if not cycle or d.get("cycle") == cycle]
+
+    # By-DTE summary
+    by_dte: dict[str, dict] = {}
+    for d in view:
+        code = d["dte_code"] or "—"
+        b = by_dte.setdefault(code, {
+            "dte_code": code, "dte_name": d["dte_name"], "sites": 0,
+            "total": 0.0, "paid": 0.0, "unpaid": 0.0, "payable": 0.0,
+        })
+        b["sites"] += 1
+        b["total"] += d["income"]
+        if d["paid"]:
+            b["paid"] += d["income"]
+        else:
+            b["unpaid"] += d["income"]
+        if d["payable"]:
+            b["payable"] += d["income"]
+    by_dte_list = sorted(by_dte.values(), key=lambda x: x["unpaid"], reverse=True)
+
+    # Monthly rollup (paid vs unpaid across all DTEs) — for charts
+    months: dict[str, dict] = {}
+    for d in view:
+        m = d.get("month")
+        if not m:
+            continue
+        b = months.setdefault(m, {"month": m, "sites": 0, "total": 0.0, "paid": 0.0, "unpaid": 0.0})
+        b["sites"] += 1
+        b["total"] += d["income"]
+        if d["paid"]:
+            b["paid"] += d["income"]
+        else:
+            b["unpaid"] += d["income"]
+    monthly = sorted(months.values(), key=lambda x: x["month"])
+
     totals = {
-        "sites": len(data),
+        "sites": len(view),
         "dtes": len(by_dte),
-        "total": sum(d["income"] for d in data),
-        "paid": sum(d["income"] for d in data if d["paid"]),
-        "unpaid": sum(d["income"] for d in data if not d["paid"]),
-        "payable": sum(d["income"] for d in data if d["payable"]),
+        "total": sum(d["income"] for d in view),
+        "paid": sum(d["income"] for d in view if d["paid"]),
+        "unpaid": sum(d["income"] for d in view if not d["paid"]),
+        "payable": sum(d["income"] for d in view if d["payable"]),
     }
-    return {"data": data, "by_dte": by_dte_list, "monthly": monthly,
+    return {"data": view, "by_dte": by_dte_list, "monthly": monthly,
             "by_cycle": by_cycle, "current_cycle": _current_cycle(),
             "totals": totals, "currency": "THB"}
 

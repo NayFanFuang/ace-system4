@@ -2074,6 +2074,8 @@ def _dta_payment_block_reason(row: DtePresiteTracking, inc: dict) -> str | None:
     """Why this row can't have its DTA paid, or None if payable."""
     if (inc.get("total") or 0) <= 0:
         return "no DTA income (not a PAC/cluster row)"
+    if not row.dta_code:
+        return "no DTA assigned to this cluster"
     if row.current_stage != STAGE_ACE_APPROVED:
         return f"stage is {row.current_stage}, must be {STAGE_ACE_APPROVED}"
     if row.dta_paid_at:
@@ -2180,7 +2182,8 @@ async def _dta_payments_data(db: AsyncSession, status: str, month: str | None,
             "dta_paid_at": _iso(r.dta_paid_at),
             "dta_paid_by": r.dta_paid_by,
             "dta_payment_ref": r.dta_payment_ref,
-            "payable": (r.current_stage == STAGE_ACE_APPROVED and not paid),
+            # Payable needs an assigned DTA — can't pay "nobody"
+            "payable": (r.current_stage == STAGE_ACE_APPROVED and not paid and bool(r.dta_code)),
         })
 
     # Pay-cycle rollup (full, before cycle filter — navigator)
@@ -2465,6 +2468,54 @@ async def my_dta_sites(
     if not employee_code:
         raise HTTPException(401, "No employee code in token")
     return await _dta_payments_data(db, "all", None, employee_code, None)
+
+
+class AssignDtaIn(BaseModel):
+    dta_code: Optional[str] = None        # None/empty → unassign
+    dta_name: Optional[str] = None
+
+
+@router.post("/tracking/{tracking_id}/assign-dta")
+async def assign_dta(
+    tracking_id: int,
+    body: AssignDtaIn,
+    payload: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign (or clear) the DTA for a PAC cluster's tracking row. The DTA drives
+    who gets paid the cluster rate. Name auto-resolves from AuthUser when omitted.
+    Finance/PM/Admin only. Cannot change a DTA once that row's DTA payment is locked.
+    """
+    if payload.get("role") not in ROLE_FINANCE:
+        raise HTTPException(403, "Only Finance/PM/Admin may assign DTA")
+    row = (await db.execute(
+        select(DtePresiteTracking).where(DtePresiteTracking.id == tracking_id)
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Tracking row not found")
+    if (row.work_type or "").upper() != "PAC":
+        raise HTTPException(409, "DTA applies to PAC (cluster) rows only")
+    if row.dta_paid_at:
+        raise HTTPException(409, "DTA payment already locked; unmark first to reassign")
+
+    code = (body.dta_code or "").strip() or None
+    name = (body.dta_name or "").strip() or None
+    if code and not name:
+        from app.models.auth_user import AuthUser
+        u = (await db.execute(
+            select(AuthUser.first_name, AuthUser.last_name)
+            .where(AuthUser.employee_code == code)
+        )).first()
+        if u:
+            name = f"{u[0] or ''} {u[1] or ''}".strip() or code
+    row.dta_code = code
+    row.dta_name = name if code else None
+    actor = payload.get("employee_code") or payload.get("sub")
+    _record_history(db, tracking_id=tracking_id, stage=row.current_stage, action="assign-dta",
+                    actor_code=actor, actor_name=payload.get("name") or actor,
+                    notes=(f"DTA assigned → {name or code}" if code else "DTA assignment cleared"))
+    await db.commit()
+    return {"ok": True, "tracking_id": tracking_id, "dta_code": code, "dta_name": row.dta_name}
 @router.get("/cluster-geo")
 async def cluster_geo(
     db: AsyncSession = Depends(get_db),

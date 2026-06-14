@@ -106,6 +106,20 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
     } finally { setBusyId(null) }
   }
 
+  // Assign / change / clear the DTA for a cluster row
+  async function assignDta(id, currentCode) {
+    const code = window.prompt('DTA employee code for this cluster (blank to clear):', currentCode || '')
+    if (code === null) return
+    setBusyId(id)
+    try {
+      const res = await apiFetch(`/api/presite/tracking/${id}/assign-dta`, {
+        method: 'POST', body: JSON.stringify({ dta_code: code.trim() || null }),
+      })
+      if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.detail || 'Failed'); return }
+      await reload()
+    } finally { setBusyId(null) }
+  }
+
   // Batch-pay every payable cluster in one cycle (Round 1 / Round 2)
   async function payWholeCycle(cycle, payableAmount) {
     if (!cycle) return
@@ -410,7 +424,17 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
                     {rows.map(r => (
                       <tr key={r.tracking_id} className={`border-t border-slate-100 hover:bg-slate-50/60 ${r.payable ? 'bg-red-50/30' : ''}`}>
                         <td className="px-4 py-3 font-mono font-black" style={{ color: PURPLE }}>{r.site_code}</td>
-                        <td className="px-4 py-3 font-bold text-slate-700">{r.dta_name}<div className="text-[.58rem] font-mono text-slate-400">{r.dta_code}</div></td>
+                        <td className="px-4 py-3">
+                          {r.dta_code
+                            ? <div className="font-bold text-slate-700">{r.dta_name}<div className="text-[.58rem] font-mono text-slate-400">{r.dta_code}</div></div>
+                            : <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[.58rem] font-black text-rose-600">unassigned</span>}
+                          {!r.paid && (
+                            <button onClick={() => assignDta(r.tracking_id, r.dta_code)} disabled={busyId === r.tracking_id}
+                              className="mt-1 block text-[.58rem] font-black text-blue-600 hover:underline disabled:opacity-40">
+                              {r.dta_code ? 'change' : '+ assign DTA'}
+                            </button>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[.6rem] font-black" style={{ background: `${PURPLE}14`, color: PURPLE }}>
                             <Layers size={10} /> {r.category}{r.site_count > 1 ? ` ×${r.site_count}` : ''}

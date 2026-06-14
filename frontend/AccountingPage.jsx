@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Bell, BookCheck, CalendarDays, CheckCircle2, ChevronDown, Coins, Download,
-  FileSpreadsheet, FileText, FileUp, Home, LogOut, Menu, RotateCcw, ScanLine,
-  Search, Trash2, Wallet, X, AlertTriangle,
+  Bell, BookCheck, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft,
+  ChevronRight, Coins, Download, FileSpreadsheet, FileText, FileUp, Home, LogOut,
+  Menu, Paperclip, RotateCcw, ScanLine, Search, Trash2, Wallet, X, AlertTriangle,
 } from 'lucide-react'
+
+const PAGE_SIZE = 50
 import { apiFetch } from './src/apiFetch.js'
 
 const ACE_BLUE = '#2447d8'
@@ -105,6 +107,8 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
   const [q, setQ] = useState('')
   const [detail, setDetail] = useState(null)
   const [busyId, setBusyId] = useState(null)
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
 
   async function load() {
     setLoading(true); setError('')
@@ -112,16 +116,20 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
       const params = new URLSearchParams()
       if (statusFilter) params.set('status', statusFilter)
       if (q.trim()) params.set('q', q.trim())
+      params.set('limit', PAGE_SIZE); params.set('offset', offset)
       const [vRes, sRes] = await Promise.all([
         apiFetch(`/api/finance/accounting/vouchers?${params}`).then(readJsonSafe),
         apiFetch('/api/finance/accounting/summary').then(readJsonSafe),
       ])
       setVouchers(vRes.vouchers || [])
+      setTotal(vRes.total || 0)
       setSummary(sRes || null)
     } catch (e) { setError(e.message || 'Failed to load') }
     finally { setLoading(false) }
   }
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [statusFilter])
+  useEffect(() => { load() /* eslint-disable-next-line */ }, [statusFilter, offset])
+  // เปลี่ยนตัวกรอง/ค้นหา -> กลับหน้าแรก
+  function applyFilters() { offset === 0 ? load() : setOffset(0) }
 
   async function doTransition(id, action, payment_ref = '') {
     setBusyId(id); setError('')
@@ -167,10 +175,18 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
     }).catch(e => setError(e.message))
   }
 
+  function viewAttachment(id) {
+    apiFetch(`/api/finance/accounting/vouchers/${id}/attachment`).then(async res => {
+      if (!res.ok) { const d = await readJsonSafe(res); throw new Error(d.detail || 'No attachment') }
+      const blob = await res.blob()
+      window.open(URL.createObjectURL(blob), '_blank', 'noopener')
+    }).catch(e => setError(e.message))
+  }
+
   const filtered = useMemo(() => {
     if (!q.trim()) return vouchers
     const t = q.trim().toLowerCase()
-    return vouchers.filter(v => [v.pv_no, v.vendor, v.project].some(x => String(x || '').toLowerCase().includes(t)))
+    return vouchers.filter(v => [v.doc_no, v.pv_no, v.vendor, v.project].some(x => String(x || '').toLowerCase().includes(t)))
   }, [vouchers, q])
 
   const byStatus = summary?.by_status || {}
@@ -291,10 +307,10 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
                 <Search size={16} className="text-slate-400" />
-                <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()}
-                  placeholder="Search PV no. / vendor / project" className="w-64 text-sm font-semibold text-slate-700 focus:outline-none" />
+                <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()}
+                  placeholder="Search doc/ref no. / vendor / project" className="w-64 text-sm font-semibold text-slate-700 focus:outline-none" />
               </div>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setOffset(0) }}
                 className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 shadow-sm focus:border-blue-400 focus:outline-none">
                 <option value="">All statuses</option>
                 <option value="DRAFT">Draft</option>
@@ -305,7 +321,7 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
 
             <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)]">
               <div className="border-b border-slate-100 px-5 py-4 text-sm font-black uppercase tracking-wide text-slate-700">
-                Payment Vouchers ({filtered.length})
+                Payment Vouchers ({total})
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[920px] border-collapse text-sm">
@@ -329,7 +345,10 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                     ) : filtered.map(v => (
                       <tr key={v.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3">
-                          <button type="button" onClick={() => openDetail(v.id)} className="font-black text-blue-700 hover:underline">{v.doc_no || `PV-${v.id}`}</button>
+                          <div className="flex items-center gap-1.5">
+                            <button type="button" onClick={() => openDetail(v.id)} className="font-black text-blue-700 hover:underline">{v.doc_no || `PV-${v.id}`}</button>
+                            {v.has_attachment && <Paperclip size={13} className="text-slate-400" title="Original PDF attached" />}
+                          </div>
                           <div className="text-xs font-semibold text-slate-400">{v.pv_no ? `Ref ${v.pv_no}` : ''}{v.item ? ` · Item ${v.item}` : ''}</div>
                         </td>
                         <td className="px-4 py-3">
@@ -347,6 +366,17 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                   </tbody>
                 </table>
               </div>
+              {total > PAGE_SIZE && (
+                <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-sm font-bold text-slate-500">
+                  <span>{offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}</span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:opacity-40"><ChevronLeft size={15} />Prev</button>
+                    <button type="button" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:opacity-40">Next<ChevronRight size={15} /></button>
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         </main>
@@ -428,6 +458,10 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
               {detail.status === 'APPROVED' && canApprove && (
                 <button type="button" disabled={busyId === detail.id} onClick={() => doTransition(detail.id, 'revert')}
                   className="inline-flex items-center gap-2 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-black text-amber-700 disabled:opacity-50"><RotateCcw size={16} />Revert to Draft</button>
+              )}
+              {detail.has_attachment && (
+                <button type="button" onClick={() => viewAttachment(detail.id)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700"><Paperclip size={16} />Source PDF</button>
               )}
               <button type="button" onClick={() => exportVoucher(detail.id)}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700"><Download size={16} />Excel PV</button>

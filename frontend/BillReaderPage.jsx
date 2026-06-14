@@ -227,7 +227,17 @@ export default function BillReaderPage({ authenticatedUser, onLogout }) {
         return
       }
       if (!res.ok) throw new Error(typeof detail === 'string' ? detail : httpErr(res, data, 'Failed to save to accounting'))
-      setSavedMsg(`Saved to accounting — ${data.doc_no || data.pv_no || 'PV'} (status: Draft). View it in the PV Ledger.`)
+      // แนบไฟล์ PDF ต้นฉบับเข้ากับ voucher (เพื่อ audit/ตรวจสอบ) — ไม่ให้ล้มถ้าแนบพลาด
+      let attachNote = ''
+      if (file && data.id) {
+        try {
+          const afd = new FormData()
+          afd.append('file', file)
+          const ares = await apiFetch(`/api/finance/accounting/vouchers/${data.id}/attachment`, { method: 'POST', body: afd })
+          attachNote = ares.ok ? ' · original PDF attached' : ' · (PDF attach failed)'
+        } catch { attachNote = ' · (PDF attach failed)' }
+      }
+      setSavedMsg(`Saved to accounting — ${data.doc_no || data.pv_no || 'PV'} (status: Draft)${attachNote}. View it in the PV Ledger.`)
       refreshStats()
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }

@@ -44,6 +44,7 @@ ACTION_LABELS = {
     "pv_paid": "Payment voucher paid",
     "pv_reverted": "Payment voucher reverted to draft",
     "pv_deleted": "Payment voucher deleted",
+    "pv_attachment_added": "Payment voucher attachment added",
 }
 
 

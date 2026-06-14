@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS payment_vouchers (
     net_total       NUMERIC(18,2) NOT NULL DEFAULT 0,    -- ยอดจ่ายสุทธิ
     note            TEXT          NOT NULL DEFAULT '',
     source_filename VARCHAR(255)  NOT NULL DEFAULT '',
+    attachment_path VARCHAR(255),
+    attachment_name VARCHAR(255)  NOT NULL DEFAULT '',
     created_by      VARCHAR(30)   NOT NULL DEFAULT '',
     created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
     approved_by     VARCHAR(30),

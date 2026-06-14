@@ -49,6 +49,8 @@ class PaymentVoucher(Base):
     net_total: Mapped[Decimal] = mapped_column(Money, default=0)               # ยอดจ่ายสุทธิ
     note: Mapped[str] = mapped_column(Text, default="")
     source_filename: Mapped[str] = mapped_column(String(255), default="")
+    attachment_path: Mapped[str | None] = mapped_column(String(255))   # path บนดิสก์ (ไม่เปิด public)
+    attachment_name: Mapped[str] = mapped_column(String(255), default="")  # ชื่อไฟล์ต้นฉบับ
     created_by: Mapped[str] = mapped_column(String(30), index=True, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     approved_by: Mapped[str | None] = mapped_column(String(30))

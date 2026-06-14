@@ -32,7 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.payment_voucher import PaymentVoucher, PaymentVoucherLine
 from app.services import bill_profiles
-from app.services.bill_reader import _desc_from_dict
+# หมายเหตุ: bill_reader ดึง OCR libs หนัก — import แบบ lazy ใน create_voucher
+# เพื่อให้ฟังก์ชันบริสุทธิ์ (q2/content_hash/validate_transition) ทดสอบได้โดยไม่ต้องมี deps เหล่านั้น
 
 # วงจรสถานะ + การเปลี่ยนสถานะที่อนุญาต
 STATUSES = ("DRAFT", "APPROVED", "PAID")
@@ -95,6 +96,22 @@ def content_hash(*, vendor: str, bill_type: str, lines: list[dict]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def validate_transition(current_status: str, action: str) -> str:
+    """ตรวจกฎ state-machine (pure) — คืนสถานะปลายทาง หรือ raise ValueError
+
+    แยกออกมาเป็นฟังก์ชันบริสุทธิ์เพื่อทดสอบได้โดยไม่ต้องมี DB
+    """
+    rule = _TRANSITIONS.get(action)
+    if not rule:
+        raise ValueError(f"ไม่รู้จักการกระทำ '{action}'")
+    src, dst = rule
+    if current_status != src:
+        raise ValueError(
+            f"เปลี่ยนสถานะไม่ได้: ต้องอยู่สถานะ {STATUS_LABEL_TH.get(src, src)} "
+            f"แต่ใบนี้เป็น {STATUS_LABEL_TH.get(current_status, current_status)}")
+    return dst
+
+
 def serialize(v: PaymentVoucher, *, with_lines: bool = False) -> dict:
     out = {
         "id": v.id, "doc_no": v.doc_no, "pv_no": v.pv_no, "item": v.item,
@@ -105,6 +122,7 @@ def serialize(v: PaymentVoucher, *, with_lines: bool = False) -> dict:
         "amount_total": _f(v.amount_total), "vat_total": _f(v.vat_total),
         "wht_total": _f(v.wht_total), "net_total": _f(v.net_total),
         "note": v.note, "source_filename": v.source_filename,
+        "has_attachment": bool(v.attachment_path), "attachment_name": v.attachment_name,
         "created_by": v.created_by,
         "created_at": v.created_at.isoformat() if v.created_at else None,
         "approved_by": v.approved_by,
@@ -155,11 +173,16 @@ async def create_voucher(db: AsyncSession, *, lines: list[dict], header: dict,
         vat = q2(ln.get("vat")) if profile.extract_vat else Decimal(0)
         wht = q2(amount * D(profile.wht_rate))
         net = q2(amount + vat - wht)
+        desc = ln.get("desc")
+        if not desc:
+            # lazy import: bill_reader ดึง OCR libs หนัก — โหลดเฉพาะเมื่อต้อง derive desc
+            from app.services.bill_reader import _desc_from_dict
+            desc = _desc_from_dict(ln, profile)
         built_lines.append(PaymentVoucherLine(
             seq=i,
             identifier=ln.get("identifier") or ln.get("phone") or "",
             period=ln.get("period") or "",
-            description=ln.get("desc") or _desc_from_dict(ln, profile),
+            description=desc,
             amount=amount, vat=vat, wht=wht, net=net,
         ))
         amount_t += amount; vat_t += vat; wht_t += wht; net_t += net
@@ -194,24 +217,35 @@ async def create_voucher(db: AsyncSession, *, lines: list[dict], header: dict,
 
 
 async def list_vouchers(db: AsyncSession, *, status: str = "", month: str = "",
-                        bill_type: str = "", q: str = "", limit: int = 200) -> list[dict]:
-    stmt = select(PaymentVoucher)
+                        bill_type: str = "", q: str = "", limit: int = 50,
+                        offset: int = 0) -> dict:
+    """รายการใบสำคัญจ่าย (มี pagination) — คืน items + total สำหรับแบ่งหน้า"""
+    limit = max(1, min(int(limit or 50), 200))
+    offset = max(0, int(offset or 0))
+
+    filters = []
     if status:
-        stmt = stmt.where(PaymentVoucher.status == status)
+        filters.append(PaymentVoucher.status == status)
     if month:
-        stmt = stmt.where(PaymentVoucher.period_month == month)
+        filters.append(PaymentVoucher.period_month == month)
     if bill_type:
-        stmt = stmt.where(PaymentVoucher.bill_type == bill_type)
+        filters.append(PaymentVoucher.bill_type == bill_type)
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(
+        filters.append(
             PaymentVoucher.doc_no.ilike(like)
             | PaymentVoucher.pv_no.ilike(like)
             | PaymentVoucher.vendor.ilike(like)
             | PaymentVoucher.project.ilike(like))
-    stmt = stmt.order_by(PaymentVoucher.created_at.desc()).limit(limit)
-    rows = (await db.execute(stmt)).scalars().all()
-    return [serialize(v) for v in rows]
+
+    total = (await db.execute(
+        select(func.count()).select_from(PaymentVoucher).where(*filters))).scalar() or 0
+    rows = (await db.execute(
+        select(PaymentVoucher).where(*filters)
+        .order_by(PaymentVoucher.created_at.desc())
+        .limit(limit).offset(offset))).scalars().all()
+    return {"vouchers": [serialize(v) for v in rows],
+            "total": int(total), "limit": limit, "offset": offset}
 
 
 async def get_voucher(db: AsyncSession, voucher_id: int) -> PaymentVoucher | None:
@@ -222,16 +256,8 @@ async def get_voucher(db: AsyncSession, voucher_id: int) -> PaymentVoucher | Non
 
 async def transition(db: AsyncSession, voucher: PaymentVoucher, *, action: str,
                      actor: str, payment_ref: str = "") -> PaymentVoucher:
-    rule = _TRANSITIONS.get(action)
-    if not rule:
-        raise ValueError(f"ไม่รู้จักการกระทำ '{action}'")
-    src, dst = rule
-    if voucher.status != src:
-        raise ValueError(
-            f"เปลี่ยนสถานะไม่ได้: ต้องอยู่สถานะ {STATUS_LABEL_TH.get(src, src)} "
-            f"แต่ใบนี้เป็น {STATUS_LABEL_TH.get(voucher.status, voucher.status)}")
+    voucher.status = validate_transition(voucher.status, action)
     now = datetime.datetime.now(datetime.timezone.utc)
-    voucher.status = dst
     if action == "approve":
         voucher.approved_by, voucher.approved_at = actor, now
     elif action == "pay":

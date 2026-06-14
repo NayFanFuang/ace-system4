@@ -220,6 +220,8 @@ async def test_aging_summary_counts_only_approved_unpaid(db):
 
     aging = await accounting.aging_summary(db, today=datetime.date(2026, 6, 14))
     by = {b["key"]: b for b in aging["buckets"]}
+    # outstanding = ยอดจ่ายสุทธิ (net) ที่ค้าง: 100 + 7(VAT) - 3(WHT) = 104
     assert by["d90_plus"]["count"] == 1
-    assert aging["total_outstanding"] == 100.0   # เฉพาะใบ approved-unpaid
-    assert aging["overdue_amount"] == 100.0
+    assert by["d90_plus"]["amount"] == 104.0
+    assert aging["total_outstanding"] == 104.0   # เฉพาะใบ approved-unpaid
+    assert aging["overdue_amount"] == 104.0

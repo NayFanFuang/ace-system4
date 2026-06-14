@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import (DateTime, ForeignKey, Integer, Numeric, String, Text,
+from sqlalchemy import (Date, DateTime, ForeignKey, Integer, Numeric, String, Text,
                         UniqueConstraint, func)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +42,7 @@ class PaymentVoucher(Base):
     requester: Mapped[str] = mapped_column(String(255), default="")            # Name (ผู้ขอเบิก)
     issued_by: Mapped[str] = mapped_column(String(255), default="")            # Issued (ผู้จัดทำ)
     status: Mapped[str] = mapped_column(String(20), index=True, default="DRAFT")
+    due_date: Mapped[date | None] = mapped_column(Date, index=True)            # วันครบกำหนดจ่าย (AP aging)
     content_hash: Mapped[str] = mapped_column(String(64), index=True, default="")  # กันบิลซ้ำ
     amount_total: Mapped[Decimal] = mapped_column(Money, default=0)            # ยอดก่อน VAT (ค่าใช้จ่ายจริง)
     vat_total: Mapped[Decimal] = mapped_column(Money, default=0)               # VAT 7% (ภาษีซื้อ)

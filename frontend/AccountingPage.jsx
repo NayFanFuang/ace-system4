@@ -52,6 +52,22 @@ function StatusBadge({ status }) {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${m.cls}`}>{m.label}</span>
 }
 
+// ป้ายอายุหนี้สำหรับใบที่ยังไม่จ่าย: เลยกำหนด = แดง, ใกล้ครบ = เหลือง
+function AgingBadge({ v }) {
+  if (v.status === 'PAID' || !v.aging_bucket) return v.due_date ? <span className="text-xs text-slate-400">{v.due_date}</span> : <span className="text-xs text-slate-300">—</span>
+  const od = v.days_overdue
+  if (v.aging_bucket === 'no_due_date') return <span className="text-xs font-bold text-slate-400">no due date</span>
+  const overdue = typeof od === 'number' && od > 0
+  const cls = overdue ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+  const label = overdue ? `Overdue ${od}d` : `Due in ${Math.abs(od)}d`
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-black ${cls}`}>{label}</span>
+      <span className="text-[11px] font-semibold text-slate-400">{v.due_date}</span>
+    </div>
+  )
+}
+
 function FinanceSidebar({ mobileOpen, onClose }) {
   return (
     <aside className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} w-72 flex-col border-r border-slate-200 bg-white/95 p-5 shadow-2xl backdrop-blur lg:sticky lg:top-0 lg:flex lg:h-screen lg:shadow-none`}>
@@ -101,6 +117,7 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [vouchers, setVouchers] = useState([])
   const [summary, setSummary] = useState(null)
+  const [aging, setAging] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -117,13 +134,15 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
       if (statusFilter) params.set('status', statusFilter)
       if (q.trim()) params.set('q', q.trim())
       params.set('limit', PAGE_SIZE); params.set('offset', offset)
-      const [vRes, sRes] = await Promise.all([
+      const [vRes, sRes, aRes] = await Promise.all([
         apiFetch(`/api/finance/accounting/vouchers?${params}`).then(readJsonSafe),
         apiFetch('/api/finance/accounting/summary').then(readJsonSafe),
+        apiFetch('/api/finance/accounting/aging').then(readJsonSafe),
       ])
       setVouchers(vRes.vouchers || [])
       setTotal(vRes.total || 0)
       setSummary(sRes || null)
+      setAging(aRes || null)
     } catch (e) { setError(e.message || 'Failed to load') }
     finally { setLoading(false) }
   }
@@ -181,6 +200,20 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
       const blob = await res.blob()
       window.open(URL.createObjectURL(blob), '_blank', 'noopener')
     }).catch(e => setError(e.message))
+  }
+
+  async function saveDueDate(id, due_date) {
+    setBusyId(id); setError('')
+    try {
+      const res = await apiFetch(`/api/finance/accounting/vouchers/${id}/due-date`, {
+        method: 'POST', body: JSON.stringify({ due_date }),
+      })
+      const data = await readJsonSafe(res)
+      if (!res.ok) throw new Error(data.detail || 'Failed to set due date')
+      if (detail && detail.id === id) setDetail(data)
+      await load()
+    } catch (e) { setError(e.message) }
+    finally { setBusyId(null) }
   }
 
   const filtered = useMemo(() => {
@@ -266,7 +299,7 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                 </div>
                 <h1 className="mt-4 text-3xl font-black text-slate-950 sm:text-4xl">Accounting — Payment Voucher Ledger</h1>
                 <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-                  Bills scanned in the Bill Reader are saved here as Payment Vouchers · workflow Draft → Approved → Paid · approved/paid amounts feed the monthly Expense Actual on Revenue &amp; Expense
+                  Bills scanned in the Bill Reader are saved here as Payment Vouchers · workflow Draft → Approved → Paid · due dates &amp; AP aging on unpaid payables · approved/paid amounts feed the monthly Expense Actual on Revenue &amp; Expense
                 </p>
               </div>
               <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm">
@@ -303,6 +336,31 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
               </section>
             )}
 
+            {/* AP aging — เจ้าหนี้ที่อนุมัติแล้วแต่ยังไม่จ่าย */}
+            {aging && aging.total_outstanding > 0 && (
+              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_18px_55px_rgba(15,23,42,0.06)] sm:p-6">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-black uppercase tracking-wide text-slate-700">AP Aging — Outstanding Payables (approved, unpaid)</div>
+                  <div className="text-xs font-bold text-slate-400">
+                    as of {aging.as_of} · outstanding <span className="text-slate-700">฿{fmt(aging.total_outstanding)}</span>
+                    {aging.overdue_amount > 0 && <> · overdue <span className="text-red-600">฿{fmt(aging.overdue_amount)}</span></>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  {aging.buckets.map(b => {
+                    const danger = !['not_due', 'no_due_date'].includes(b.key) && b.amount > 0
+                    return (
+                      <div key={b.key} className={`rounded-xl border px-3 py-3 ${danger ? 'border-red-200 bg-red-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                        <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">{b.label}</div>
+                        <div className={`mt-1 text-base font-black ${danger ? 'text-red-700' : 'text-slate-900'}`}>฿{fmt(b.amount)}</div>
+                        <div className="text-[11px] font-bold text-slate-400">{b.count} voucher(s)</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
@@ -333,15 +391,16 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                       <th className="px-4 py-3 text-right">Amount</th>
                       <th className="px-4 py-3 text-right">WHT</th>
                       <th className="px-4 py-3 text-right">Net</th>
+                      <th className="px-4 py-3">Due / Aging</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={8} className="px-4 py-10 text-center text-sm font-bold text-slate-400">Loading…</td></tr>
+                      <tr><td colSpan={9} className="px-4 py-10 text-center text-sm font-bold text-slate-400">Loading…</td></tr>
                     ) : filtered.length === 0 ? (
-                      <tr><td colSpan={8} className="px-4 py-10 text-center text-sm font-bold text-slate-400">No vouchers yet — scan a bill in Bill Reader and click “Save to Accounting”.</td></tr>
+                      <tr><td colSpan={9} className="px-4 py-10 text-center text-sm font-bold text-slate-400">No vouchers yet — scan a bill in Bill Reader and click “Save to Accounting”.</td></tr>
                     ) : filtered.map(v => (
                       <tr key={v.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3">
@@ -359,6 +418,7 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
                         <td className="px-4 py-3 text-right font-bold text-slate-800">{fmt(v.amount_total)}</td>
                         <td className="px-4 py-3 text-right font-semibold text-red-600">{v.wht_total ? `(${fmt(v.wht_total)})` : '–'}</td>
                         <td className="px-4 py-3 text-right font-black text-slate-900">{fmt(v.net_total)}</td>
+                        <td className="px-4 py-3"><AgingBadge v={v} /></td>
                         <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
                         <td className="px-4 py-3">{rowActions(v)}</td>
                       </tr>
@@ -404,7 +464,18 @@ export default function AccountingPage({ authenticatedUser, onLogout }) {
               ))}
             </div>
 
-            <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+            {/* วันครบกำหนดจ่าย + อายุหนี้ (แก้ไขได้เมื่อยังไม่จ่าย) */}
+            <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-wide text-slate-400">Due date</div>
+                <input type="date" defaultValue={detail.due_date || ''} disabled={detail.status === 'PAID' || busyId === detail.id}
+                  onChange={e => saveDueDate(detail.id, e.target.value)}
+                  className="mt-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-800 focus:border-blue-400 focus:outline-none disabled:opacity-60" />
+              </div>
+              <div className="pb-1"><AgingBadge v={detail} /></div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-500">

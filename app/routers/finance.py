@@ -160,6 +160,10 @@ class VoucherTransition(BaseModel):
     payment_ref: str = ""
 
 
+class VoucherDueDate(BaseModel):
+    due_date: str = ""                # 'YYYY-MM-DD' หรือว่าง = ล้างวันครบกำหนด
+
+
 def _actor(payload: dict) -> str:
     return payload.get("employee_code") or payload.get("sub") or ""
 
@@ -237,6 +241,15 @@ async def accounting_summary(
     return await accounting.monthly_summary(db)
 
 
+@router.get("/accounting/aging")
+async def accounting_aging(
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """รายงานอายุหนี้เจ้าหนี้ (AP aging) — หนี้ที่อนุมัติแล้วแต่ยังไม่จ่าย แบ่งตามช่วงวันเลยกำหนด"""
+    return await accounting.aging_summary(db)
+
+
 @router.get("/accounting/vouchers/{voucher_id}")
 async def get_voucher(
     voucher_id: int,
@@ -286,6 +299,24 @@ async def transition_voucher(
     except Exception:
         await db.rollback()
     return result
+
+
+@router.post("/accounting/vouchers/{voucher_id}/due-date")
+async def set_voucher_due_date(
+    voucher_id: int,
+    body: VoucherDueDate,
+    payload: dict = Depends(require_finance_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """ตั้ง/แก้วันครบกำหนดจ่าย (YYYY-MM-DD) — ส่งค่าว่างเพื่อล้าง"""
+    due = accounting.parse_iso_date(body.due_date)
+    if body.due_date and due is None:
+        raise HTTPException(400, "รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)")
+    pv = await accounting.get_voucher(db, voucher_id)
+    if not pv:
+        raise HTTPException(404, "ไม่พบใบสำคัญจ่าย")
+    pv = await accounting.set_due_date(db, pv, due)
+    return accounting.serialize(pv, with_lines=True)
 
 
 @router.delete("/accounting/vouchers/{voucher_id}")

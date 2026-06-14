@@ -49,6 +49,18 @@ _MONTHS = {m: i + 1 for i, m in enumerate(
     ["jan", "feb", "mar", "apr", "may", "jun",
      "jul", "aug", "sep", "oct", "nov", "dec"])}
 
+# เครดิตเทอมเริ่มต้น (วัน) ใช้คำนวณวันครบกำหนดจ่ายเมื่อไม่ได้ระบุเอง
+DEFAULT_CREDIT_DAYS = 30
+
+# ช่วงอายุหนี้ (AP aging) — (key, label, ขอบล่าง, ขอบบนของวันเลยกำหนด)
+AGING_BUCKETS = [
+    ("not_due", "ยังไม่ถึงกำหนด", None, 0),
+    ("d1_30", "เกิน 1–30 วัน", 1, 30),
+    ("d31_60", "เกิน 31–60 วัน", 31, 60),
+    ("d61_90", "เกิน 61–90 วัน", 61, 90),
+    ("d90_plus", "เกิน 90 วัน", 91, None),
+]
+
 
 def D(x) -> Decimal:
     """แปลงค่าเป็น Decimal อย่างปลอดภัย (ผ่าน str กัน float artefact)"""
@@ -86,6 +98,60 @@ def _period_month(pv_date: str, lines: list[dict]) -> str:
     return f"{today.year:04d}-{today.month:02d}"
 
 
+def parse_pv_date(pv_date: str) -> datetime.date | None:
+    """แปลงวันที่บนฟอร์ม 'DD-Mon-YYYY' -> date (ใช้ตั้งวันครบกำหนดจ่าย)"""
+    m = re.search(r"(\d{1,2})[-/\s]+([A-Za-z]{3})[A-Za-z]*[-/\s]+(\d{4})", pv_date or "")
+    if m and m.group(2).lower() in _MONTHS:
+        try:
+            return datetime.date(int(m.group(3)), _MONTHS[m.group(2).lower()], int(m.group(1)))
+        except ValueError:
+            return None
+    return None
+
+
+def parse_iso_date(s: str) -> datetime.date | None:
+    """แปลง 'YYYY-MM-DD' -> date (สำหรับตั้งวันครบกำหนดจากผู้ใช้)"""
+    try:
+        return datetime.date.fromisoformat((s or "").strip()) if s else None
+    except ValueError:
+        return None
+
+
+def _default_due_date(pv_date: str, period_month: str) -> datetime.date | None:
+    """วันครบกำหนดเริ่มต้น = วันที่ PV + เครดิตเทอม ถ้าอ่านวันที่ไม่ได้ใช้สิ้นเดือนบัญชี + เครดิต"""
+    base = parse_pv_date(pv_date)
+    if base is None and period_month:
+        try:
+            y, mo = int(period_month[:4]), int(period_month[5:7])
+            base = datetime.date(y, mo, 28)  # ปลายเดือนคร่าว ๆ
+        except (ValueError, IndexError):
+            base = None
+    return base + datetime.timedelta(days=DEFAULT_CREDIT_DAYS) if base else None
+
+
+def aging_of(due: datetime.date | None, status: str,
+             today: datetime.date | None = None) -> tuple[int | None, str | None]:
+    """คืน (วันเลยกำหนด, bucket key) สำหรับหนี้ที่ยังไม่จ่าย
+
+    PAID = ชำระแล้ว ไม่นับ aging ; ไม่มี due_date = bucket 'no_due_date'
+    วันเลยกำหนด > 0 = เลยมาแล้ว, <= 0 = ยังไม่ถึงกำหนด
+    """
+    if status == "PAID":
+        return None, None
+    if due is None:
+        return None, "no_due_date"
+    today = today or datetime.date.today()
+    overdue = (today - due).days
+    if overdue <= 0:
+        return overdue, "not_due"
+    for key, _label, lo, hi in AGING_BUCKETS:
+        if lo is None:
+            continue
+        if (hi is None and overdue >= lo) or (hi is not None and lo <= overdue <= hi):
+            return overdue, key
+    return overdue, "d90_plus"
+
+
 def content_hash(*, vendor: str, bill_type: str, lines: list[dict]) -> str:
     """ลายเซ็นเนื้อหาบิล: vendor + ชนิด + ชุดบรรทัด (identifier/period/amount) — ไว้ตรวจซ้ำ"""
     parts = sorted(
@@ -121,6 +187,7 @@ def serialize(v: PaymentVoucher, *, with_lines: bool = False) -> dict:
         "status_label": STATUS_LABEL_TH.get(v.status, v.status),
         "amount_total": _f(v.amount_total), "vat_total": _f(v.vat_total),
         "wht_total": _f(v.wht_total), "net_total": _f(v.net_total),
+        "due_date": v.due_date.isoformat() if v.due_date else None,
         "note": v.note, "source_filename": v.source_filename,
         "has_attachment": bool(v.attachment_path), "attachment_name": v.attachment_name,
         "created_by": v.created_by,
@@ -132,6 +199,8 @@ def serialize(v: PaymentVoucher, *, with_lines: bool = False) -> dict:
         "payment_ref": v.payment_ref,
         "line_count": len(v.lines),
     }
+    days_overdue, bucket = aging_of(v.due_date, v.status)
+    out["days_overdue"], out["aging_bucket"] = days_overdue, bucket
     if with_lines:
         out["lines"] = [{
             "seq": l.seq, "identifier": l.identifier, "period": l.period,
@@ -165,6 +234,8 @@ async def create_voucher(db: AsyncSession, *, lines: list[dict], header: dict,
     period_month = _period_month(header.get("date") or "", lines)
     year = period_month[:4]
     chash = content_hash(vendor=vendor, bill_type=bill_type, lines=lines)
+    due_date = parse_iso_date(header.get("due_date") or "") \
+        or _default_due_date(header.get("date") or "", period_month)
 
     amount_t = vat_t = wht_t = net_t = Decimal(0)
     built_lines = []
@@ -197,6 +268,7 @@ async def create_voucher(db: AsyncSession, *, lines: list[dict], header: dict,
             bill_type=bill_type or "", vendor=vendor or profile.default_vendor or "",
             project=header.get("project") or "", requester=header.get("name") or "",
             issued_by=header.get("issued") or "", status="DRAFT", content_hash=chash,
+            due_date=due_date,
             amount_total=q2(amount_t), vat_total=q2(vat_t),
             wht_total=q2(wht_t), net_total=q2(net_t),
             source_filename=filename or "", created_by=created_by or "",
@@ -275,6 +347,52 @@ async def delete_voucher(db: AsyncSession, voucher: PaymentVoucher) -> None:
         raise ValueError("ลบได้เฉพาะใบที่ยังเป็นร่าง (DRAFT) เท่านั้น")
     await db.delete(voucher)
     await db.commit()
+
+
+async def set_due_date(db: AsyncSession, voucher: PaymentVoucher,
+                       due_date: datetime.date | None) -> PaymentVoucher:
+    """ตั้ง/แก้วันครบกำหนดจ่าย"""
+    voucher.due_date = due_date
+    await db.commit()
+    return await get_voucher(db, voucher.id)
+
+
+async def aging_summary(db: AsyncSession, today: datetime.date | None = None) -> dict:
+    """รายงานอายุหนี้เจ้าหนี้ (AP aging) — เฉพาะหนี้ที่อนุมัติแล้วแต่ยังไม่จ่าย (APPROVED)
+
+    แบ่งตามช่วงวันเลยกำหนด + รวมยอด net ที่ค้างจ่ายในแต่ละช่วง
+    """
+    today = today or datetime.date.today()
+    rows = (await db.execute(
+        select(PaymentVoucher.due_date, PaymentVoucher.net_total)
+        .where(PaymentVoucher.status == "APPROVED"))).all()
+
+    keys = [b[0] for b in AGING_BUCKETS] + ["no_due_date"]
+    buckets = {k: {"count": 0, "amount": Decimal(0)} for k in keys}
+    labels = {b[0]: b[1] for b in AGING_BUCKETS}
+    labels["no_due_date"] = "ไม่มีวันครบกำหนด"
+
+    total_outstanding = Decimal(0)
+    overdue_amount = Decimal(0)
+    for due, net in rows:
+        net = D(net)
+        _, bucket = aging_of(due, "APPROVED", today)
+        bucket = bucket or "no_due_date"
+        buckets[bucket]["count"] += 1
+        buckets[bucket]["amount"] += net
+        total_outstanding += net
+        if bucket not in ("not_due", "no_due_date"):
+            overdue_amount += net
+
+    return {
+        "as_of": today.isoformat(),
+        "buckets": [{
+            "key": k, "label": labels[k],
+            "count": buckets[k]["count"], "amount": _f(buckets[k]["amount"]),
+        } for k in keys],
+        "total_outstanding": _f(total_outstanding),
+        "overdue_amount": _f(overdue_amount),
+    }
 
 
 async def monthly_summary(db: AsyncSession) -> dict:

@@ -10,6 +10,7 @@ Two layers:
 Run:  pytest tests/test_accounting.py
 """
 
+import datetime
 from decimal import Decimal
 
 import pytest
@@ -70,6 +71,30 @@ def test_period_month_parses_form_date_and_falls_back():
     # ไม่มีข้อมูล -> เดือนปัจจุบัน (รูปแบบ YYYY-MM)
     fallback = accounting._period_month("", [])
     assert len(fallback) == 7 and fallback[4] == "-"
+
+
+def test_default_due_date_adds_credit_term():
+    due = accounting._default_due_date("14-Jun-2026", "2026-06")
+    assert due == datetime.date(2026, 6, 14) + datetime.timedelta(
+        days=accounting.DEFAULT_CREDIT_DAYS)
+
+
+def test_aging_buckets():
+    today = datetime.date(2026, 6, 14)
+    A = lambda d: accounting.aging_of(d, "APPROVED", today)
+    assert A(datetime.date(2026, 6, 20)) == (-6, "not_due")     # ยังไม่ถึงกำหนด
+    assert A(datetime.date(2026, 6, 1))[1] == "d1_30"           # เลย 13 วัน
+    assert A(datetime.date(2026, 5, 1))[1] == "d31_60"          # เลย 44 วัน
+    assert A(datetime.date(2026, 3, 1))[1] == "d90_plus"        # เลย >90 วัน
+    assert A(None) == (None, "no_due_date")
+    # ใบที่จ่ายแล้วไม่นับ aging
+    assert accounting.aging_of(datetime.date(2026, 1, 1), "PAID", today) == (None, None)
+
+
+def test_parse_iso_date():
+    assert accounting.parse_iso_date("2026-06-14") == datetime.date(2026, 6, 14)
+    assert accounting.parse_iso_date("") is None
+    assert accounting.parse_iso_date("not-a-date") is None
 
 
 # ---------------------------------------------------------------------------
@@ -172,3 +197,29 @@ async def test_status_machine_and_summary_vat_split(db):
     assert month["input_vat"] == 7.0            # VAT แยกเป็นภาษีซื้อ
     assert month["net_paid"] == 104.0           # 100 + 7 - 3(WHT)
     assert summ["total_expense_actual"] == 100.0
+
+
+@pytest.mark.asyncio
+async def test_aging_summary_counts_only_approved_unpaid(db):
+    # ใบ approved ที่เลยกำหนดมานาน
+    overdue = await accounting.create_voucher(
+        db, lines=[_line(100, 7)], header={"date": "14-Jun-2026"}, vendor="AIS",
+        bill_type="telecom", filename="a.pdf", created_by="HR-001")
+    await accounting.set_due_date(db, overdue, datetime.date(2020, 1, 1))
+    overdue = await accounting.get_voucher(db, overdue.id)
+    await accounting.transition(db, overdue, action="approve", actor="DIR-1")
+
+    # ใบ approved+paid ไม่นับใน aging
+    paid = await accounting.create_voucher(
+        db, lines=[_line(50, 3.5, ident="0700000000")], header={"date": "14-Jun-2026"},
+        vendor="True", bill_type="telecom", filename="b.pdf", created_by="HR-001")
+    paid = await accounting.get_voucher(db, paid.id)
+    await accounting.transition(db, paid, action="approve", actor="DIR-1")
+    paid = await accounting.get_voucher(db, paid.id)
+    await accounting.transition(db, paid, action="pay", actor="ACC-1")
+
+    aging = await accounting.aging_summary(db, today=datetime.date(2026, 6, 14))
+    by = {b["key"]: b for b in aging["buckets"]}
+    assert by["d90_plus"]["count"] == 1
+    assert aging["total_outstanding"] == 100.0   # เฉพาะใบ approved-unpaid
+    assert aging["overdue_amount"] == 100.0

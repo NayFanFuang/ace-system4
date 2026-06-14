@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS payment_vouchers (
     requester       VARCHAR(255)  NOT NULL DEFAULT '',
     issued_by       VARCHAR(255)  NOT NULL DEFAULT '',
     status          VARCHAR(20)   NOT NULL DEFAULT 'DRAFT',
+    due_date        DATE,                                -- วันครบกำหนดจ่าย (AP aging)
     content_hash    VARCHAR(64)   NOT NULL DEFAULT '',   -- กันบิลซ้ำ
     amount_total    NUMERIC(18,2) NOT NULL DEFAULT 0,    -- ยอดก่อน VAT (ค่าใช้จ่ายจริง)
     vat_total       NUMERIC(18,2) NOT NULL DEFAULT 0,    -- VAT 7% (ภาษีซื้อ)
@@ -44,6 +45,7 @@ CREATE INDEX IF NOT EXISTS ix_payment_vouchers_pv_no         ON payment_vouchers
 CREATE INDEX IF NOT EXISTS ix_payment_vouchers_period_month  ON payment_vouchers (period_month);
 CREATE INDEX IF NOT EXISTS ix_payment_vouchers_bill_type     ON payment_vouchers (bill_type);
 CREATE INDEX IF NOT EXISTS ix_payment_vouchers_status        ON payment_vouchers (status);
+CREATE INDEX IF NOT EXISTS ix_payment_vouchers_due_date      ON payment_vouchers (due_date);
 CREATE INDEX IF NOT EXISTS ix_payment_vouchers_content_hash  ON payment_vouchers (content_hash);
 CREATE INDEX IF NOT EXISTS ix_payment_vouchers_created_by    ON payment_vouchers (created_by);
 

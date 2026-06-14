@@ -69,17 +69,20 @@ const PHASE_ORDER = ['FINANCE_REVIEW', 'PROJECT_PLAN', 'APPROVAL', 'EXECUTION', 
 function Card({ children, className = '' }) {
   return <section className={`rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)] ${className}`}>{children}</section>
 }
-function StatCard({ label, value, helper, tone = ACE_BLUE, icon: Icon }) {
+function StatCard({ label, value, helper, tone = ACE_BLUE, icon: Icon, onClick }) {
   return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ background: `${tone}12`, color: tone }}>
-          <Icon size={21} strokeWidth={2.3} />
+    <Card className={`p-5 ${onClick ? 'cursor-pointer transition hover:-translate-y-0.5 hover:shadow-[0_22px_60px_rgba(15,23,42,0.12)]' : ''}`}>
+      <button type="button" onClick={onClick} disabled={!onClick} className="block w-full text-left disabled:cursor-default">
+        <div className="flex items-center justify-between">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ background: `${tone}12`, color: tone }}>
+            <Icon size={21} strokeWidth={2.3} />
+          </div>
+          {onClick && <ChevronRight size={16} className="text-slate-300" />}
         </div>
-      </div>
-      <div className="mt-5 text-xs font-black uppercase tracking-[.08em] text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-black text-slate-950">{value}</div>
-      {helper && <div className="mt-1 text-xs font-semibold text-slate-400">{helper}</div>}
+        <div className="mt-5 text-xs font-black uppercase tracking-[.08em] text-slate-500">{label}</div>
+        <div className="mt-2 text-3xl font-black text-slate-950">{value}</div>
+        {helper && <div className="mt-1 text-xs font-semibold text-slate-400">{helper}</div>}
+      </button>
     </Card>
   )
 }
@@ -94,7 +97,7 @@ function Badge({ meta }) {
 }
 
 // Horizontal stacked bar for collection mix
-function CollectionMixBar({ summary }) {
+function CollectionMixBar({ summary, onSegment }) {
   const segs = [
     { k: 'BILLED',     v: summary.billed_value,     ...BILLING_META.BILLED },
     { k: 'PARTIAL',    v: summary.partial_value,    ...BILLING_META.PARTIAL },
@@ -106,12 +109,14 @@ function CollectionMixBar({ summary }) {
     <div>
       <div className="flex h-5 w-full overflow-hidden rounded-full bg-slate-100">
         {segs.map(s => s.v > 0 && (
-          <div key={s.k} style={{ width: `${(s.v / total) * 100}%`, background: s.tone }} title={`${s.label}: ${fmtBaht(s.v)}`} />
+          <div key={s.k} onClick={() => onSegment && onSegment(s.k)} className={onSegment ? 'cursor-pointer hover:opacity-80' : ''}
+            style={{ width: `${(s.v / total) * 100}%`, background: s.tone }} title={`${s.label}: ${fmtBaht(s.v)} — คลิกเพื่อดูรายการ`} />
         ))}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {segs.map(s => (
-          <div key={s.k} className="flex items-center gap-2">
+          <div key={s.k} onClick={() => onSegment && onSegment(s.k)}
+            className={`flex items-center gap-2 ${onSegment ? 'cursor-pointer rounded-lg p-1 hover:bg-slate-50' : ''}`}>
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.tone }} />
             <div className="text-xs">
               <div className="font-black text-slate-700">{s.label}</div>
@@ -182,7 +187,7 @@ function MonthlyTrend({ monthly }) {
 }
 
 // Breakdown table (owner / vendor / project)
-function BreakdownTable({ title, icon: Icon, tone, rows, keyLabel }) {
+function BreakdownTable({ title, icon: Icon, tone, rows, keyLabel, onRow }) {
   if (!rows || rows.length === 0) return null
   return (
     <Card className="overflow-hidden">
@@ -200,7 +205,8 @@ function BreakdownTable({ title, icon: Icon, tone, rows, keyLabel }) {
         </thead>
         <tbody>
           {rows.map(r => (
-            <tr key={r.key} className="border-t border-slate-50">
+            <tr key={r.key} onClick={() => onRow && onRow(r.key)}
+              className={`border-t border-slate-50 ${onRow ? 'cursor-pointer hover:bg-indigo-50/40' : ''}`}>
               <td className="px-5 py-2.5 font-bold text-slate-700">{keyLabel === 'เจ้าของงาน' ? (OWNER_LABELS[r.key] || r.key) : r.key}</td>
               <td className="px-5 py-2.5 text-center font-black text-slate-600">{r.count}</td>
               <td className="px-5 py-2.5 text-right font-black text-slate-900">{fmtBaht(r.value)}</td>
@@ -274,6 +280,10 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
     setAceProject(code === '—' ? '' : code)
     setTab('detail')
   }
+
+  // Drill from a KPI card / mix segment → apply the matching filter + show rows
+  function focusBilling(state) { setBillingState(state); setPayState(''); setTab('detail') }
+  function focusPay(state) { setPayState(state); setBillingState(''); setTab('detail') }
 
   // Client-side search across PO number / site / project
   const visibleRows = useMemo(() => {
@@ -433,16 +443,16 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
 
           {/* KPI cards */}
           <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="มูลค่า PO รวม" value={fmtBaht(s.total_value)} helper={`${fmtNum(s.total)} PO`} tone={ACE_BLUE} icon={Layers} />
-            <StatCard label="เก็บเงินแล้ว" value={fmtBaht(s.billed_value)} helper={`${fmtNum(s.billed)} PO · ${s.collection_rate || 0}% collection`} tone={GREEN} icon={CheckCircle2} />
-            <StatCard label="ค้างเก็บ" value={fmtBaht(s.outstanding_value)} helper={`${fmtNum((s.not_billed || 0) + (s.partial || 0))} PO (รวมบางส่วน)`} tone={AMBER} icon={Hourglass} />
-            <StatCard label="ถูก Reject" value={fmtBaht(s.rejected_value)} helper={`${fmtNum(s.rejected)} PO`} tone={RED} icon={XCircle} />
+            <StatCard label="มูลค่า PO รวม" value={fmtBaht(s.total_value)} helper={`${fmtNum(s.total)} PO`} tone={ACE_BLUE} icon={Layers} onClick={() => { clearFilters(); setTab('detail') }} />
+            <StatCard label="เก็บเงินแล้ว" value={fmtBaht(s.billed_value)} helper={`${fmtNum(s.billed)} PO · ${s.collection_rate || 0}% collection`} tone={GREEN} icon={CheckCircle2} onClick={() => focusBilling('BILLED')} />
+            <StatCard label="ค้างเก็บ" value={fmtBaht(s.outstanding_value)} helper={`${fmtNum((s.not_billed || 0) + (s.partial || 0))} PO (รวมบางส่วน)`} tone={AMBER} icon={Hourglass} onClick={() => focusBilling('NOT_BILLED')} />
+            <StatCard label="ถูก Reject" value={fmtBaht(s.rejected_value)} helper={`${fmtNum(s.rejected)} PO`} tone={RED} icon={XCircle} onClick={() => focusBilling('REJECTED')} />
           </section>
           <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="จ่าย DTE แล้ว" value={fmtBaht(s.dte_paid_value)} helper={`${fmtNum(s.dte_paid)} PO · ${s.dte_pay_rate || 0}% paid`} tone={CYAN} icon={Wallet} />
-            <StatCard label="ค้างจ่าย DTE" value={fmtBaht(s.dte_unpaid_value)} helper={`${fmtNum(s.dte_unpaid)} PO`} tone={PURPLE} icon={Clock} />
-            <StatCard label="เก็บบางส่วน (AC1)" value={fmtBaht(s.partial_value)} helper={`${fmtNum(s.partial)} PO`} tone={AMBER} icon={TrendingUp} />
-            <StatCard label="ค้างนาน > 14 วัน" value={fmtNum((d.aging_watch || []).filter(a => a.aging_days > 14).length)} helper="PO ที่ต้องเร่งติดตาม" tone={RED} icon={AlertTriangle} />
+            <StatCard label="จ่าย DTE แล้ว" value={fmtBaht(s.dte_paid_value)} helper={`${fmtNum(s.dte_paid)} PO · ${s.dte_pay_rate || 0}% paid`} tone={CYAN} icon={Wallet} onClick={() => focusPay('PAID')} />
+            <StatCard label="ค้างจ่าย DTE" value={fmtBaht(s.dte_unpaid_value)} helper={`${fmtNum(s.dte_unpaid)} PO`} tone={PURPLE} icon={Clock} onClick={() => focusPay('UNPAID')} />
+            <StatCard label="เก็บบางส่วน (AC1)" value={fmtBaht(s.partial_value)} helper={`${fmtNum(s.partial)} PO`} tone={AMBER} icon={TrendingUp} onClick={() => focusBilling('PARTIAL')} />
+            <StatCard label="ค้างนาน > 14 วัน" value={fmtNum((d.aging_watch || []).filter(a => a.aging_days > 14).length)} helper="PO ที่ต้องเร่งติดตาม" tone={RED} icon={AlertTriangle} onClick={() => setTab('aging')} />
           </section>
 
           {/* Filters */}
@@ -497,7 +507,7 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
               <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Card className="p-5">
                   <h3 className="mb-4 inline-flex items-center gap-2 text-base font-black text-slate-950"><CircleDollarSign size={18} style={{ color: GREEN }} /> สัดส่วนการเก็บเงิน (มูลค่า)</h3>
-                  <CollectionMixBar summary={s} />
+                  <CollectionMixBar summary={s} onSegment={focusBilling} />
                 </Card>
                 <Card className="p-5">
                   <h3 className="mb-4 inline-flex items-center gap-2 text-base font-black text-slate-950"><GitBranch size={18} style={{ color: ACE_BLUE }} /> Pipeline — PO อยู่ขั้นไหน</h3>
@@ -516,9 +526,12 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                 <MonthlyTrend monthly={d.monthly} />
               </Card>
               <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <BreakdownTable title="ค้างอยู่ที่ใคร" icon={Users} tone={PURPLE} rows={d.by_owner} keyLabel="เจ้าของงาน" />
-                <BreakdownTable title="แยกตาม Vendor" icon={Building2} tone={CYAN} rows={d.by_vendor} keyLabel="Vendor" />
-                <BreakdownTable title="แยกตามโปรเจกต์" icon={Layers} tone={ACE_BLUE} rows={d.by_project} keyLabel="Project" />
+                <BreakdownTable title="ค้างอยู่ที่ใคร" icon={Users} tone={PURPLE} rows={d.by_owner} keyLabel="เจ้าของงาน"
+                  onRow={k => { setOwnerRole(k); setTab('detail') }} />
+                <BreakdownTable title="แยกตาม Vendor" icon={Building2} tone={CYAN} rows={d.by_vendor} keyLabel="Vendor"
+                  onRow={k => { setVendor(k); setTab('detail') }} />
+                <BreakdownTable title="แยกตามโปรเจกต์" icon={Layers} tone={ACE_BLUE} rows={d.by_project} keyLabel="Project"
+                  onRow={drillProject} />
               </section>
             </>
           )}

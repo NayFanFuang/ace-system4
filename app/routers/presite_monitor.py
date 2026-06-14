@@ -2516,6 +2516,27 @@ async def assign_dta(
                     notes=(f"DTA assigned → {name or code}" if code else "DTA assignment cleared"))
     await db.commit()
     return {"ok": True, "tracking_id": tracking_id, "dta_code": code, "dta_name": row.dta_name}
+
+
+@router.get("/dta-candidates")
+async def dta_candidates(
+    payload: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Active login users that can be assigned as a DTA — powers the assign
+    dropdown. Finance/PM/Admin only (matches who can assign)."""
+    if payload.get("role") not in ROLE_FINANCE:
+        raise HTTPException(403, "Only Finance/PM/Admin may list DTA candidates")
+    from app.models.auth_user import AuthUser
+    rows = (await db.execute(
+        select(AuthUser.employee_code, AuthUser.first_name, AuthUser.last_name)
+        .where(AuthUser.is_active.is_(True))
+        .order_by(AuthUser.first_name, AuthUser.last_name)
+    )).all()
+    return {"data": [
+        {"code": c, "name": f"{fn or ''} {ln or ''}".strip() or c}
+        for c, fn, ln in rows
+    ]}
 @router.get("/cluster-geo")
 async def cluster_geo(
     db: AsyncSession = Depends(get_db),

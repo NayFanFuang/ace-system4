@@ -56,6 +56,8 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
   const [cycleFilter, setCycleFilter] = useState('')
   const [dtaFilter, setDtaFilter] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [candidates, setCandidates] = useState([])
+  const [assigningId, setAssigningId] = useState(null)  // row id showing the picker
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -82,6 +84,14 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
 
   useEffect(() => { reload() }, [reload])
 
+  // DTA candidates for the assign dropdown (active login users)
+  useEffect(() => {
+    apiFetch('/api/presite/dta-candidates')
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(d => setCandidates(d.data || []))
+      .catch(() => setCandidates([]))
+  }, [])
+
   const monthsAvailable = Array.from(new Set(rows.map(r => r.month).filter(Boolean))).sort().reverse()
 
   async function markPaid(id) {
@@ -106,14 +116,13 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
     } finally { setBusyId(null) }
   }
 
-  // Assign / change / clear the DTA for a cluster row
-  async function assignDta(id, currentCode) {
-    const code = window.prompt('DTA employee code for this cluster (blank to clear):', currentCode || '')
-    if (code === null) return
+  // Assign / change / clear the DTA for a cluster row (code from the dropdown)
+  async function assignDta(id, code) {
     setBusyId(id)
+    setAssigningId(null)
     try {
       const res = await apiFetch(`/api/presite/tracking/${id}/assign-dta`, {
-        method: 'POST', body: JSON.stringify({ dta_code: code.trim() || null }),
+        method: 'POST', body: JSON.stringify({ dta_code: code || null }),
       })
       if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.detail || 'Failed'); return }
       await reload()
@@ -428,12 +437,20 @@ export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
                           {r.dta_code
                             ? <div className="font-bold text-slate-700">{r.dta_name}<div className="text-[.58rem] font-mono text-slate-400">{r.dta_code}</div></div>
                             : <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[.58rem] font-black text-rose-600">unassigned</span>}
-                          {!r.paid && (
-                            <button onClick={() => assignDta(r.tracking_id, r.dta_code)} disabled={busyId === r.tracking_id}
-                              className="mt-1 block text-[.58rem] font-black text-blue-600 hover:underline disabled:opacity-40">
+                          {!r.paid && (assigningId === r.tracking_id ? (
+                            <select autoFocus defaultValue={r.dta_code || ''} disabled={busyId === r.tracking_id}
+                              onChange={e => assignDta(r.tracking_id, e.target.value)}
+                              onBlur={() => setAssigningId(null)}
+                              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[.62rem] font-bold text-slate-700">
+                              <option value="">— clear —</option>
+                              {candidates.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
+                            </select>
+                          ) : (
+                            <button onClick={() => setAssigningId(r.tracking_id)}
+                              className="mt-1 block text-[.58rem] font-black text-blue-600 hover:underline">
                               {r.dta_code ? 'change' : '+ assign DTA'}
                             </button>
-                          )}
+                          ))}
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[.6rem] font-black" style={{ background: `${PURPLE}14`, color: PURPLE }}>

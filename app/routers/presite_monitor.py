@@ -1285,18 +1285,7 @@ async def my_sites(
     # PAC tracking has NULL item_dis (varies per child PO) → pull count + a
     # representative item_dis from the child POs to detect SSOA vs Cluster.
     cluster_keys = [r.cluster_key for r in rows if r.work_type == "PAC" and r.cluster_key]
-    cluster_site_count: dict[str, int] = {}
-    cluster_item_dis: dict[str, str] = {}
-    if cluster_keys:
-        crows = (await db.execute(
-            select(ProjectPO.cluster_site, func.count(), func.min(ProjectPO.item_dis))
-            .where(ProjectPO.cluster_site.in_(cluster_keys))
-            .group_by(ProjectPO.cluster_site)
-        )).all()
-        for cs, cnt, idis in crows:
-            cluster_site_count[cs] = int(cnt)
-            if idis:
-                cluster_item_dis[cs] = idis
+    cluster_site_count, cluster_item_dis = await _pac_cluster_stats(db, cluster_keys)
 
     # Resolve approver codes → names (for the Approved column)
     from app.models.auth_user import AuthUser
@@ -1377,6 +1366,41 @@ async def my_sites(
     }
 
 
+# Canonical "billable PAC site line" filter — matches the cluster detail view.
+# A_/B_ prefixed Cluster/SSOA DT lines are the real per-site DT work; everything
+# else sharing the cluster_site (junk, non-DT, ancillary lines) is excluded so it
+# can't multiply the per-site rate.
+PAC_SITE_ITEM_RE = r"^[AB]_(Cluster|SSOA) "
+
+
+async def _pac_cluster_stats(db: AsyncSession, cluster_keys: list[str]) -> tuple[dict[str, int], dict[str, str]]:
+    """Per-cluster billable site count + representative item_dis for PAC rate calc.
+
+    Counts only genuine PAC DT lines (item_dis ~ PAC_SITE_ITEM_RE) so non-DT lines
+    sharing the cluster_site can't inflate the per-site multiplier (was: raw COUNT
+    of every row in the cluster). The representative item_dis is the most common
+    matching line (mode), not an alphabetical pick (was: func.min, which biased
+    'Cluster' < 'SSOA'), so SSOA vs Cluster is decided by what the cluster is.
+    """
+    counts: dict[str, int] = {}
+    items: dict[str, str] = {}
+    if not cluster_keys:
+        return counts, items
+    rows = (await db.execute(
+        select(ProjectPO.cluster_site, ProjectPO.item_dis, func.count().label("n"))
+        .where(ProjectPO.cluster_site.in_(cluster_keys),
+               ProjectPO.work_type == "PAC",
+               ProjectPO.item_dis.op("~*")(PAC_SITE_ITEM_RE))
+        .group_by(ProjectPO.cluster_site, ProjectPO.item_dis)
+        .order_by(ProjectPO.cluster_site, func.count().desc())
+    )).all()
+    for cs, idis, n in rows:
+        counts[cs] = counts.get(cs, 0) + int(n)
+        if cs not in items and idis:   # first row per cluster = highest count (mode)
+            items[cs] = idis
+    return counts, items
+
+
 async def _compute_income_for_tracking(db: AsyncSession, r: DtePresiteTracking) -> dict:
     """Compute the live DTE income for a single tracking row.
 
@@ -1385,12 +1409,9 @@ async def _compute_income_for_tracking(db: AsyncSession, r: DtePresiteTracking) 
     """
     from app.services.dte_rates import compute_income
     if (r.work_type or "").upper() == "PAC" and r.cluster_key:
-        crow = (await db.execute(
-            select(func.count(), func.min(ProjectPO.item_dis))
-            .where(ProjectPO.cluster_site == r.cluster_key)
-        )).one()
-        sc = int(crow[0]) or 1
-        idis = r.item_dis or crow[1]
+        counts, items = await _pac_cluster_stats(db, [r.cluster_key])
+        sc = counts.get(r.cluster_key, 1)
+        idis = r.item_dis or items.get(r.cluster_key)
     else:
         sc = 1
         idis = r.item_dis
@@ -1410,19 +1431,9 @@ async def _finance_payments_data(db: AsyncSession, status: str, month: str | Non
         stmt.order_by(DtePresiteTracking.dt_done_at.desc().nullslast(), DtePresiteTracking.id.desc())
     )).scalars().all()
 
-    # PAC cluster site-count + representative item_dis
+    # PAC cluster site-count + representative item_dis (billable DT lines only)
     cluster_keys = [r.cluster_key for r in rows if r.work_type == "PAC" and r.cluster_key]
-    cluster_site_count: dict[str, int] = {}
-    cluster_item_dis: dict[str, str] = {}
-    if cluster_keys:
-        crows = (await db.execute(
-            select(ProjectPO.cluster_site, func.count(), func.min(ProjectPO.item_dis))
-            .where(ProjectPO.cluster_site.in_(cluster_keys)).group_by(ProjectPO.cluster_site)
-        )).all()
-        for cs, cnt, idis in crows:
-            cluster_site_count[cs] = int(cnt)
-            if idis:
-                cluster_item_dis[cs] = idis
+    cluster_site_count, cluster_item_dis = await _pac_cluster_stats(db, cluster_keys)
 
     # Resolve approver + DTE names
     codes = set()

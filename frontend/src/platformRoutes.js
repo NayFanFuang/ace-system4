@@ -138,6 +138,12 @@ export const ROUTE_DEFINITIONS = {
     roles: ROLES.FINANCE,
     component: 'DtePaymentsPage',
   },
+  '/finance/po-tracking': {
+    title: 'ติดตามเก็บเงิน PO',
+    group: 'Finance',
+    roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'PROJECT_ADMIN', 'PM', 'HR_ADMIN', 'DIRECTOR', 'ACCOUNTING'],
+    component: 'POTrackingDashboard',
+  },
   '/finance/bill-reader': {
     title: 'Bill Reader → PV',
     group: 'Finance',

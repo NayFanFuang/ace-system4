@@ -15,8 +15,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps import ROLE_LABELS, ROLE_SCOPES, get_current_user, require_hr_read_user, require_hr_user, require_project_user, require_self_or_admin
+from app.deps import ROLE_LABELS, ROLE_SCOPES, get_current_user, require_hr_read_user, require_hr_user, require_po_finance_action_user, require_po_tracking_user, require_project_user, require_self_or_admin
 from app.models.auth_user import AuthUser
+from app.models.billing_plan import BillingPlan
 from app.models.clock import ClockSite, ClockSession
 from app.models.employee import Employee, EmployeeRelocation, HWImportLog, ProjectAssignment, ProjectCatalog, ProjectPO, ProjectSite
 from app.services.auth_service import hash_password, validate_password_policy
@@ -324,6 +325,84 @@ def _po_aging_days(row: ProjectPO) -> int:
     if basis.tzinfo is None:
         basis = basis.replace(tzinfo=timezone.utc)
     return max(0, (_now_utc() - basis).days)
+
+
+# --- PO Collection Tracking helpers ----------------------------------------
+# Two parallel money legs are tracked per PO:
+#   • Collection IN  — billing Huawei (hw_billed_at / AC1 / AC2 invoices)
+#   • Payment OUT    — paying the DTE field engineer (dte_paid_at)
+# These derive a coarse status used by the Collection Tracking dashboard so
+# Finance/Project/Executives can answer "what's collected, what's pending,
+# what's rejected" at a glance.
+
+# Workflow statuses grouped into phases for the pipeline funnel.
+PO_PHASE_MAP = {
+    "FINANCE_REVIEW": {"NEW", "AUTO_MAPPED", "NEED_REVIEW", "NEED_MAPPING_REVIEW",
+                       "FINANCE_CHECKING", "FINANCE_HOLD", "FINANCE_RECHECK", "RETURNED_TO_FINANCE"},
+    "PROJECT_PLAN":   {"PENDING_SITE_MAP", "SITE_MAPPED", "READY_TO_SEND_PROJECT",
+                       "WAITING_PROJECT_CHECK", "PROJECT_ADJUSTING", "PROJECT_ACCEPTED",
+                       "RETURNED_TO_PROJECT"},
+    "APPROVAL":       {"PENDING_APPROVAL", "APPROVED", "LOCKED_FOR_WORK"},
+    "EXECUTION":      {"PLANNED", "IN_PROGRESS", "WORK_DONE", "LEADER_CHECKING", "LEADER_APPROVED"},
+    "CLOSE_OUT":      {"PENDING_PAYMENT", "PENDING_BILLING", "DTE_PAID", "HW_BILLED", "CLOSED"},
+    "HOLD":           {"ON_HOLD"},
+    "REJECTED":       {"REJECTED"},
+}
+
+
+def _po_phase(status: str | None) -> str:
+    s = (status or "").upper()
+    for phase, members in PO_PHASE_MAP.items():
+        if s in members:
+            return phase
+    return "FINANCE_REVIEW"
+
+
+def _po_billing_state(row: ProjectPO) -> str:
+    """Collection-IN state: has Finance billed Huawei for this PO yet?
+
+    REJECTED   — PO was rejected, nothing to collect
+    BILLED     — fully invoiced (hw_billed / closed, or both AC milestones done)
+    PARTIAL    — first invoice issued (AC1) but not the final one
+    NOT_BILLED — nothing invoiced yet
+    """
+    status = (row.workflow_status or "").upper()
+    if status == "REJECTED":
+        return "REJECTED"
+    fully_billed = bool(row.hw_billed_at) or status in {"HW_BILLED", "CLOSED"} or (
+        bool(row.ac1_billed_at) and bool(row.ac2_billed_at)
+    )
+    if fully_billed:
+        return "BILLED"
+    if row.ac1_billed_at or row.ac2_billed_at:
+        return "PARTIAL"
+    return "NOT_BILLED"
+
+
+def _po_dte_pay_state(row: ProjectPO) -> str:
+    """Payment-OUT state: has Finance paid the DTE for this PO yet?"""
+    status = (row.workflow_status or "").upper()
+    if status == "REJECTED":
+        return "N/A"
+    if row.dte_paid_at or status in {"DTE_PAID", "CLOSED"}:
+        return "PAID"
+    return "UNPAID"
+
+
+def _po_months(row: ProjectPO) -> set[str]:
+    """All "YYYY-MM" months this PO touches — billing plan, actual billed, paid,
+    or on-air. Used by the month-range filter so both planned and collected POs
+    surface within the selected window."""
+    months: set[str] = set()
+    for v in (row.ac1_plan_month, row.ac2_plan_month):
+        if v:
+            months.add(v.strip())
+    for dt in (row.ac1_billed_at, row.ac2_billed_at, row.hw_billed_at, row.dte_paid_at):
+        if dt:
+            months.add(dt.strftime("%Y-%m"))
+    if row.on_air:
+        months.add(row.on_air.strftime("%Y-%m"))
+    return months
 
 
 def _infer_po_workflow_defaults(body: POIn) -> dict:
@@ -2352,6 +2431,274 @@ async def list_project_pos(
     return {"data": [po_to_dict(row) for row in rows], "total": len(rows)}
 
 
+@router.get("/project-pos/collection-dashboard")
+async def project_po_collection_dashboard(
+    ace_project_code: str = Query(""),
+    work_type: str = Query(""),
+    vendor: str = Query(""),
+    owner_role: str = Query(""),
+    billing_state: str = Query(""),   # NOT_BILLED | PARTIAL | BILLED | REJECTED
+    dte_pay_state: str = Query(""),   # PAID | UNPAID
+    aging_min: int = Query(0),        # only rows stuck >= N days
+    month_from: str = Query(""),      # "YYYY-MM" — filter PO months >= this
+    month_to: str = Query(""),        # "YYYY-MM" — filter PO months <= this
+    payload: dict = Depends(require_po_tracking_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aggregated PO collection-tracking dashboard.
+
+    Answers, across both money legs (collect from HW · pay the DTE):
+      • what is collected / partially billed / not billed / rejected
+      • where each PO is sitting and who owns it now (Finance vs Project)
+      • aging — POs stuck too long in their current stage
+
+    Returns KPI summary, pipeline funnel, breakdowns (owner/vendor/project),
+    an aging watchlist, and the filtered row list (one call, ACCOUNTING-safe).
+    """
+    stmt = select(ProjectPO)
+    if ace_project_code:
+        stmt = stmt.where(ProjectPO.ace_project_code == ace_project_code.upper())
+    if work_type:
+        stmt = stmt.where(ProjectPO.work_type == work_type.upper())
+    if vendor:
+        stmt = stmt.where(ProjectPO.vendor == vendor.upper())
+    if owner_role:
+        stmt = stmt.where(ProjectPO.current_owner_role == owner_role.upper())
+    all_rows = (await db.execute(
+        stmt.order_by(ProjectPO.po_number, ProjectPO.po_line)
+    )).scalars().all()
+
+    bs_filter = billing_state.upper()
+    ps_filter = dte_pay_state.upper()
+    mf = month_from.strip()
+    mt = month_to.strip()
+
+    def _in_month_range(row: ProjectPO) -> bool:
+        if not mf and not mt:
+            return True
+        months = _po_months(row)
+        if not months:
+            return False
+        if mf and not any(m >= mf for m in months):
+            return False
+        if mt and not any(m <= mt for m in months):
+            return False
+        # require at least one month inside [mf, mt]
+        return any((not mf or m >= mf) and (not mt or m <= mt) for m in months)
+
+    def _amt(row: ProjectPO) -> float:
+        try:
+            return float(row.line_amount) if row.line_amount is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    # Accumulators
+    summary = {k: 0.0 for k in (
+        "total_value", "billed_value", "partial_value", "not_billed_value",
+        "rejected_value", "dte_paid_value", "dte_unpaid_value",
+    )}
+    counts = {k: 0 for k in (
+        "total", "billed", "partial", "not_billed", "rejected",
+        "dte_paid", "dte_unpaid", "no_amount",
+    )}
+    by_status: dict[str, dict] = {}
+    by_phase: dict[str, dict] = {}
+    by_owner: dict[str, dict] = {}
+    by_vendor: dict[str, dict] = {}
+    by_project: dict[str, dict] = {}
+    proj_roll: dict[str, dict] = {}    # ace_project_code → full collection rollup
+    monthly: dict[str, dict] = {}      # "YYYY-MM" → {collected, dte_paid}
+    rows_out: list[dict] = []
+    aging_watch: list[dict] = []
+
+    def _bump(bucket: dict, key: str, value: float):
+        slot = bucket.setdefault(key, {"count": 0, "value": 0.0})
+        slot["count"] += 1
+        slot["value"] += value
+
+    for row in all_rows:
+        if not _in_month_range(row):
+            continue
+        b_state = _po_billing_state(row)
+        p_state = _po_dte_pay_state(row)
+        # Row-level filters that depend on derived state
+        if bs_filter and b_state != bs_filter:
+            continue
+        if ps_filter and p_state != ps_filter:
+            continue
+        aging = _po_aging_days(row)
+        if aging_min and aging < aging_min:
+            continue
+
+        amt = _amt(row)
+        phase = _po_phase(row.workflow_status)
+
+        counts["total"] += 1
+        summary["total_value"] += amt
+        if amt == 0.0:
+            counts["no_amount"] += 1
+
+        if b_state == "BILLED":
+            counts["billed"] += 1; summary["billed_value"] += amt
+        elif b_state == "PARTIAL":
+            counts["partial"] += 1; summary["partial_value"] += amt
+        elif b_state == "REJECTED":
+            counts["rejected"] += 1; summary["rejected_value"] += amt
+        else:
+            counts["not_billed"] += 1; summary["not_billed_value"] += amt
+
+        if p_state == "PAID":
+            counts["dte_paid"] += 1; summary["dte_paid_value"] += amt
+        elif p_state == "UNPAID":
+            counts["dte_unpaid"] += 1; summary["dte_unpaid_value"] += amt
+
+        # Monthly trend — attribute amount to the month each leg actually completed
+        if b_state == "BILLED" and row.hw_billed_at:
+            monthly.setdefault(row.hw_billed_at.strftime("%Y-%m"), {"collected": 0.0, "dte_paid": 0.0})["collected"] += amt
+        if p_state == "PAID" and row.dte_paid_at:
+            monthly.setdefault(row.dte_paid_at.strftime("%Y-%m"), {"collected": 0.0, "dte_paid": 0.0})["dte_paid"] += amt
+
+        _bump(by_status, (row.workflow_status or "NEW").upper(), amt)
+        _bump(by_phase, phase, amt)
+        _bump(by_owner, (row.current_owner_role or "FINANCE").upper(), amt)
+        _bump(by_vendor, (row.vendor or "HW").upper(), amt)
+        _bump(by_project, (row.ace_project_code or "—").upper(), amt)
+
+        # Per-project collection rollup (for drill-down + PDF report)
+        pkey = (row.ace_project_code or "—").upper()
+        pr = proj_roll.setdefault(pkey, {k: 0.0 for k in (
+            "count", "total", "billed", "partial", "not_billed", "rejected",
+            "dte_paid", "dte_unpaid")})
+        pr["count"] += 1
+        pr["total"] += amt
+        pr[{"BILLED": "billed", "PARTIAL": "partial", "REJECTED": "rejected"}.get(b_state, "not_billed")] += amt
+        if p_state == "PAID":
+            pr["dte_paid"] += amt
+        elif p_state == "UNPAID":
+            pr["dte_unpaid"] += amt
+
+        rec = po_to_dict(row)
+        rec["billing_state"] = b_state
+        rec["dte_pay_state"] = p_state
+        rec["phase"] = phase
+        rec["aging_days"] = aging
+        rows_out.append(rec)
+
+        # Aging watchlist: not closed, not rejected, still owed collection
+        if b_state in {"NOT_BILLED", "PARTIAL"} and (row.workflow_status or "").upper() not in {"CLOSED", "REJECTED"}:
+            aging_watch.append({
+                "id": row.id,
+                "po_number": row.po_number,
+                "po_line": row.po_line,
+                "cluster_site": row.cluster_site,
+                "site_code": row.site_code,
+                "vendor": (row.vendor or "HW"),
+                "work_type": row.work_type,
+                "ace_project_code": row.ace_project_code,
+                "workflow_status": row.workflow_status,
+                "current_owner_role": row.current_owner_role,
+                "current_owner_user": row.current_owner_user,
+                "billing_state": b_state,
+                "line_amount": amt,
+                "aging_days": aging,
+            })
+
+    # Collection rate = billed value over collectable (exclude rejected) value
+    collectable = summary["total_value"] - summary["rejected_value"]
+    collection_rate = round(100.0 * summary["billed_value"] / collectable, 1) if collectable > 0 else 0.0
+    # DTE pay rate over rows that have a pay state (paid + unpaid)
+    payable_universe = counts["dte_paid"] + counts["dte_unpaid"]
+    dte_pay_rate = round(100.0 * counts["dte_paid"] / payable_universe, 1) if payable_universe > 0 else 0.0
+
+    aging_watch.sort(key=lambda r: r["aging_days"], reverse=True)
+
+    # Plan vs Actual — top-down billing targets (BillingPlan) per month, scoped
+    # to the same project/vendor filters and the month range when set.
+    plan_stmt = select(BillingPlan)
+    if ace_project_code:
+        plan_stmt = plan_stmt.where(BillingPlan.ace_project_code == ace_project_code.upper())
+    if vendor:
+        plan_stmt = plan_stmt.where(BillingPlan.vendor == vendor.upper())
+    plan_rows = (await db.execute(plan_stmt)).scalars().all()
+    plan_by_month: dict[str, float] = {}
+    plan_by_project: dict[str, float] = {}
+    for plan in plan_rows:
+        m = (plan.month or "").strip()
+        if not m:
+            continue
+        if mf and m < mf:
+            continue
+        if mt and m > mt:
+            continue
+        amt_p = float(plan.planned_amount or 0)
+        plan_by_month[m] = plan_by_month.get(m, 0.0) + amt_p
+        pk = (plan.ace_project_code or "—").upper()
+        plan_by_project[pk] = plan_by_project.get(pk, 0.0) + amt_p
+
+    all_months = sorted(set(monthly.keys()) | set(plan_by_month.keys()))
+    monthly_out = [{
+        "month": m,
+        "plan": round(plan_by_month.get(m, 0.0), 2),
+        "collected": round(monthly.get(m, {}).get("collected", 0.0), 2),
+        "dte_paid": round(monthly.get(m, {}).get("dte_paid", 0.0), 2),
+    } for m in all_months]
+    total_plan = round(sum(plan_by_month.values()), 2)
+    plan_collection_rate = round(100.0 * summary["billed_value"] / total_plan, 1) if total_plan > 0 else 0.0
+
+    # Per-project rollup output (drill-down + PDF). Include projects that only
+    # have a plan target (no PO yet) so gaps are visible.
+    project_rollup = []
+    for pk in sorted(set(proj_roll.keys()) | set(plan_by_project.keys())):
+        r = proj_roll.get(pk, {k: 0.0 for k in (
+            "count", "total", "billed", "partial", "not_billed", "rejected", "dte_paid", "dte_unpaid")})
+        plan_p = plan_by_project.get(pk, 0.0)
+        collectable = r["total"] - r["rejected"]
+        project_rollup.append({
+            "ace_project_code": pk,
+            "count": int(r["count"]),
+            "total": round(r["total"], 2),
+            "billed": round(r["billed"], 2),
+            "partial": round(r["partial"], 2),
+            "outstanding": round(r["not_billed"] + r["partial"], 2),
+            "not_billed": round(r["not_billed"], 2),
+            "rejected": round(r["rejected"], 2),
+            "dte_paid": round(r["dte_paid"], 2),
+            "dte_unpaid": round(r["dte_unpaid"], 2),
+            "plan": round(plan_p, 2),
+            "collection_rate": round(100.0 * r["billed"] / collectable, 1) if collectable > 0 else 0.0,
+            "plan_rate": round(100.0 * r["billed"] / plan_p, 1) if plan_p > 0 else 0.0,
+        })
+    project_rollup.sort(key=lambda x: x["total"], reverse=True)
+
+    def _flatten(bucket: dict) -> list[dict]:
+        return sorted(
+            ({"key": k, "count": v["count"], "value": round(v["value"], 2)} for k, v in bucket.items()),
+            key=lambda x: x["value"], reverse=True,
+        )
+
+    return {
+        "summary": {
+            **{k: round(v, 2) for k, v in summary.items()},
+            **counts,
+            "collection_rate": collection_rate,
+            "dte_pay_rate": dte_pay_rate,
+            "outstanding_value": round(summary["not_billed_value"] + summary["partial_value"], 2),
+            "total_plan": total_plan,
+            "plan_collection_rate": plan_collection_rate,
+        },
+        "by_status": _flatten(by_status),
+        "by_phase": _flatten(by_phase),
+        "by_owner": _flatten(by_owner),
+        "by_vendor": _flatten(by_vendor),
+        "by_project": _flatten(by_project),
+        "project_rollup": project_rollup,
+        "monthly": monthly_out,
+        "aging_watch": aging_watch[:60],
+        "data": rows_out,
+        "total": len(rows_out),
+    }
+
+
 class ReassignAceIn(BaseModel):
     po_ids: list[int]
     ace_project_code: str | None = None  # None / "" → move to NEED_REVIEW (unassigned)
@@ -3104,6 +3451,77 @@ async def patch_po_billing(
     await db.commit()
     await db.refresh(row)
     return po_to_dict(row)
+
+
+class PoCollectionActionIn(BaseModel):
+    action: str                       # bill_ac1|bill_ac2|unbill_ac1|unbill_ac2|mark_dte_paid|unmark_dte_paid
+    invoice_no: str | None = None     # for bill_ac1 / bill_ac2
+    payment_ref: str | None = None    # for mark_dte_paid
+
+
+@router.post("/project-pos/{po_id}/collection-action")
+async def po_collection_action(
+    po_id: int,
+    body: PoCollectionActionIn,
+    request: Request,
+    payload: dict = Depends(require_po_finance_action_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quick finance actions from the Collection Tracking dashboard.
+
+    Updates only the close-out money legs (HW billing / DTE payment) and the
+    derived hw_billed_at sync — it intentionally does NOT rewind the workflow
+    state machine, so it is safe to call from a monitoring view. Every action
+    is audit-logged.
+    """
+    action = (body.action or "").lower().strip()
+    row = (await db.execute(select(ProjectPO).where(ProjectPO.id == po_id))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "PO not found")
+
+    actor = payload.get("employee_code") or payload.get("sub")
+    now = datetime.now(timezone.utc)
+
+    if action in ("bill_ac1", "bill_ac2", "unbill_ac1", "unbill_ac2"):
+        m = "ac1" if action.endswith("ac1") else "ac2"
+        billed = action.startswith("bill_")
+        setattr(row, f"{m}_billed_at", now if billed else None)
+        if billed and body.invoice_no is not None:
+            setattr(row, f"{m}_invoice_no", body.invoice_no.strip() or None)
+        # Keep legacy hw_billed_at in sync: billed when all applicable AC done.
+        has_ac2 = "/" in (row.payment_terms or "")
+        ac1_ok = row.ac1_billed_at is not None
+        ac2_ok = (row.ac2_billed_at is not None) if has_ac2 else True
+        if ac1_ok and ac2_ok:
+            if row.hw_billed_at is None:
+                row.hw_billed_at = now
+                row.hw_billed_by = actor
+        else:
+            row.hw_billed_at = None
+            row.hw_billed_by = None
+    elif action == "mark_dte_paid":
+        row.dte_paid_at = now
+        row.dte_paid_by = actor
+    elif action == "unmark_dte_paid":
+        row.dte_paid_at = None
+        row.dte_paid_by = None
+    else:
+        raise HTTPException(400, f"Unknown action '{action}'")
+
+    row.last_action_at = now
+    await write_audit_log(
+        db, action=f"po_collection_{action}", entity_type="project_po", entity_id=str(row.id),
+        payload=payload,
+        new_value={"po_number": row.po_number, "po_line": row.po_line,
+                   "invoice_no": body.invoice_no, "payment_ref": body.payment_ref},
+        request=request, source="PO Collection Dashboard",
+    )
+    await db.commit()
+    await db.refresh(row)
+    rec = po_to_dict(row)
+    rec["billing_state"] = _po_billing_state(row)
+    rec["dte_pay_state"] = _po_dte_pay_state(row)
+    return rec
 
 
 async def ensure_clockapp_sync(db: AsyncSession, row: ProjectPO,

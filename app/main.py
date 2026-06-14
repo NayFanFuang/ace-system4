@@ -17,6 +17,7 @@ from app.models.leave import LeaveRequest  # noqa: F401 — registers table
 from app.models.meeting_room import MeetingRoom, RoomBooking  # noqa: F401 — registers tables
 from app.models.office_store import StockItem, StockMovement, StockRequest, StockRequestLine  # noqa: F401 — registers tables
 from app.models.presite_tracking import DtePresiteHistory, DtePresiteSession, DtePresiteTracking  # noqa: F401 — registers tables
+from app.models.dta_cluster import DtaCluster, DtaClusterRound  # noqa: F401 — registers tables
 from app.models.system_error import SystemErrorLog  # noqa: F401 — registers table
 from app.models.worklog import DailyWorkLog  # noqa: F401 — registers table
 from app.models.bill_correction import BillCorrection  # noqa: F401 — registers table

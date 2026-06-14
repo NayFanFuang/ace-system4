@@ -119,6 +119,16 @@ class DtePresiteTracking(Base):
     dte_paid_by: Mapped[str | None] = mapped_column(String(120))
     dte_payment_ref: Mapped[str | None] = mapped_column(String(120))
 
+    # Frozen income snapshot at mark-paid time — added 2026-06-14.
+    # Income is recomputed live from dte_rates.py for unpaid rows, but once paid
+    # the amount is locked here so later rate/cluster/item_dis changes can't drift
+    # the reported "paid" total. NULL on unpaid rows.
+    dte_paid_amount: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    dte_paid_income_dt: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    dte_paid_income_report: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    dte_paid_category: Mapped[str | None] = mapped_column(String(40))
+    dte_paid_site_count: Mapped[int | None] = mapped_column(Integer)
+
     current_stage: Mapped[str] = mapped_column(String(30), default=STAGE_FULL_ONAIR, index=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

@@ -138,6 +138,12 @@ export const ROUTE_DEFINITIONS = {
     roles: ROLES.FINANCE,
     component: 'DtePaymentsPage',
   },
+  '/finance/dta-payments': {
+    title: 'DTA Payments',
+    group: 'Finance',
+    roles: ROLES.FINANCE,
+    component: 'DtaPaymentsPage',
+  },
   '/finance/bill-reader': {
     title: 'Bill Reader → PV',
     group: 'Finance',
@@ -167,6 +173,12 @@ export const ROUTE_DEFINITIONS = {
     group: 'Project',
     roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'PROJECT_ADMIN', 'PM', 'DIRECTOR', 'HR_ADMIN', 'EMPLOYEE'],
     component: 'ReportUploadPage',
+  },
+  '/project/dta-income': {
+    title: 'My DTA Income',
+    group: 'Project',
+    roles: ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'PROJECT_ADMIN', 'PM', 'DIRECTOR', 'HR_ADMIN', 'EMPLOYEE'],
+    component: 'DtaMyIncomePage',
   },
   '/office/meeting-rooms': {
     title: 'จองห้องประชุม',

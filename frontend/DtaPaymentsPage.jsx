@@ -1,11 +1,12 @@
-// DtePaymentsPage — Finance monitor for DTE payments.
-// Who to pay · how much · details · mark paid. Mounted at /finance/dte-payments.
-// Role-gated (Finance/PM/Admin) via platformRoutes.
+// DtaPaymentsPage — Finance monitor for DTA payments.
+// Who to pay · how much · details · mark paid. Mounted at /finance/dta-payments.
+// Role-gated (Finance/PM/Admin) via platformRoutes. Mirrors DtePaymentsPage,
+// but DTA earns a flat per-cluster rate on PAC work (no DT/Report split, no .rar).
 
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  Wallet, TrendingUp, Clock, CheckCircle2, Users, RefreshCw, Layers, Wifi,
-  FileArchive, Filter, BadgeCheck, BarChart3, PieChart, FileSpreadsheet, Printer,
+  Wallet, Clock, CheckCircle2, Users, RefreshCw, Layers,
+  Filter, BadgeCheck, BarChart3, PieChart, FileSpreadsheet, Printer,
 } from 'lucide-react'
 import { apiFetch } from './src/apiFetch.js'
 
@@ -42,9 +43,9 @@ function StatCard({ label, value, helper, tone = ACE_BLUE, icon: Icon }) {
   )
 }
 
-export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
+export default function DtaPaymentsPage({ authenticatedUser, onLogout }) {
   const [rows, setRows] = useState([])
-  const [byDte, setByDte] = useState([])
+  const [byDta, setByDta] = useState([])
   const [monthly, setMonthly] = useState([])
   const [byCycle, setByCycle] = useState([])
   const [currentCycle, setCurrentCycle] = useState(null)
@@ -53,7 +54,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
   const [statusFilter, setStatusFilter] = useState('all')  // all | paid | unpaid
   const [monthFilter, setMonthFilter] = useState('')
   const [cycleFilter, setCycleFilter] = useState('')
-  const [dteFilter, setDteFilter] = useState('')
+  const [dtaFilter, setDtaFilter] = useState('')
   const [busyId, setBusyId] = useState(null)
 
   const reload = useCallback(async () => {
@@ -63,93 +64,91 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
       if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
       if (monthFilter) params.set('month', monthFilter)
       if (cycleFilter) params.set('cycle', cycleFilter)
-      if (dteFilter) params.set('dte_code', dteFilter)
-      const res = await apiFetch(`/api/presite/finance/payments?${params.toString()}`)
+      if (dtaFilter) params.set('dta_code', dtaFilter)
+      const res = await apiFetch(`/api/presite/dta/finance/payments?${params.toString()}`)
       const d = await res.json()
       setRows(d.data || [])
-      setByDte(d.by_dte || [])
+      setByDta(d.by_dta || [])
       setMonthly(d.monthly || [])
       setByCycle(d.by_cycle || [])
       setCurrentCycle(d.current_cycle || null)
       setTotals(d.totals || {})
     } catch {
-      setRows([]); setByDte([]); setMonthly([]); setByCycle([]); setTotals({})
+      setRows([]); setByDta([]); setMonthly([]); setByCycle([]); setTotals({})
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, monthFilter, cycleFilter, dteFilter])
+  }, [statusFilter, monthFilter, cycleFilter, dtaFilter])
 
   useEffect(() => { reload() }, [reload])
 
-  // Months present (for filter) — derived from rows (when no month filter, rows span all)
   const monthsAvailable = Array.from(new Set(rows.map(r => r.month).filter(Boolean))).sort().reverse()
 
-  async function markPaid(id) {
+  async function markPaid(rfName) {
     const ref = window.prompt('Payment reference (optional):', '')
     if (ref === null) return
-    setBusyId(id)
+    setBusyId(rfName)
     try {
-      const res = await apiFetch(`/api/presite/tracking/${id}/mark-paid`, {
-        method: 'POST', body: JSON.stringify({ payment_ref: ref || null }),
+      const res = await apiFetch('/api/presite/dta/finance/mark-paid', {
+        method: 'POST', body: JSON.stringify({ rf_cluster_name: rfName, payment_ref: ref || null }),
       })
       if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.detail || 'Failed'); return }
       await reload()
     } finally { setBusyId(null) }
   }
-  async function unmarkPaid(id) {
+  async function unmarkPaid(rfName) {
     if (!window.confirm('Revert this payment to UNPAID?')) return
-    setBusyId(id)
+    setBusyId(rfName)
     try {
-      const res = await apiFetch(`/api/presite/tracking/${id}/unmark-paid`, { method: 'POST' })
+      const res = await apiFetch('/api/presite/dta/finance/unmark-paid', {
+        method: 'POST', body: JSON.stringify({ rf_cluster_name: rfName }),
+      })
       if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.detail || 'Failed'); return }
       await reload()
     } finally { setBusyId(null) }
   }
 
-  // Batch-pay every payable site in one cycle (Round 1 / Round 2)
+  // Batch-pay every payable cluster in one cycle (Round 1 / Round 2)
   async function payWholeCycle(cycle, payableAmount) {
     if (!cycle) return
-    const ref = window.prompt(`Pay ALL ready sites in cycle ${cycle} (${fmtBaht(payableAmount)}).\nPayment reference (optional):`, cycle)
+    const ref = window.prompt(`Pay ALL ready clusters in cycle ${cycle} (${fmtBaht(payableAmount)}).\nPayment reference (optional):`, cycle)
     if (ref === null) return
     setBusyId(`cycle:${cycle}`)
     try {
-      const res = await apiFetch('/api/presite/finance/pay-cycle', {
-        method: 'POST', body: JSON.stringify({ cycle, payment_ref: ref || null, dte_code: dteFilter || null }),
+      const res = await apiFetch('/api/presite/dta/finance/pay-cycle', {
+        method: 'POST', body: JSON.stringify({ cycle, payment_ref: ref || null, dte_code: dtaFilter || null }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) { alert(d.detail || 'Failed'); return }
-      alert(`Paid ${d.paid_count} site(s) · ${fmtBaht(d.total)}${d.skipped ? ` · ${d.skipped} skipped (not ready)` : ''}`)
+      alert(`Paid ${d.paid_count} cluster(s) · ${fmtBaht(d.total)}${d.skipped ? ` · ${d.skipped} skipped (not ready)` : ''}`)
       await reload()
     } finally { setBusyId(null) }
   }
 
-  const name = authenticatedUser?.name || ''
-
-  // Export Excel (current filters) — fetch with auth → blob download
   async function exportExcel() {
     const params = new URLSearchParams()
     if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
     if (monthFilter) params.set('month', monthFilter)
     if (cycleFilter) params.set('cycle', cycleFilter)
-    if (dteFilter) params.set('dte_code', dteFilter)
+    if (dtaFilter) params.set('dta_code', dtaFilter)
     try {
-      const res = await apiFetch(`/api/presite/finance/payments/export?${params.toString()}`)
+      const res = await apiFetch(`/api/presite/dta/finance/payments/export?${params.toString()}`)
       if (!res.ok) { alert('Export failed (HTTP ' + res.status + ')'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `DTE_Payments_${monthFilter || 'all'}_${statusFilter}.xlsx`
+      a.download = `DTA_Payments_${monthFilter || 'all'}_${statusFilter}.xlsx`
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(url)
     } catch { alert('Export error') }
   }
 
-  // PDF voucher for one DTE — open a printable window (Save as PDF)
-  function printVoucher(dteCode) {
-    const items = rows.filter(r => r.dte_code === dteCode)
-    if (items.length === 0) { alert('No rows for this DTE'); return }
-    const dteName = items[0].dte_name || dteCode
+  // PDF voucher for one DTA — open a printable window (Save as PDF)
+  function printVoucher(dtaCode) {
+    const items = rows.filter(r => r.dta_code === dtaCode)
+    if (items.length === 0) { alert('No rows for this DTA'); return }
+    const dtaName = items[0].dta_name || dtaCode
     const total = items.reduce((a, r) => a + r.income, 0)
     const paid = items.reduce((a, r) => a + (r.paid ? r.income : 0), 0)
     const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -157,15 +156,15 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
       <tr>
         <td>${i + 1}</td>
         <td>${r.site_code}</td>
-        <td>${r.work_type}</td>
         <td>${r.category}</td>
-        <td>${r.dt_done_date || '-'}</td>
+        <td style="text-align:center">${r.site_count || 1}</td>
         <td>${(r.approved_at || '').slice(0,10) || '-'}</td>
+        <td>${r.cycle || '-'}</td>
         <td style="text-align:right">${fmtBaht(r.income)}</td>
         <td style="text-align:center">${r.paid ? 'PAID' : (r.payable ? 'READY' : 'UNPAID')}</td>
-        <td>${r.dte_payment_ref || ''}</td>
+        <td>${r.dta_payment_ref || ''}</td>
       </tr>`).join('')
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Payment Voucher — ${dteName}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>DTA Payment Voucher — ${dtaName}</title>
       <style>
         body{font-family:-apple-system,'Segoe UI',Tahoma,sans-serif;padding:32px;color:#0f172a}
         h1{font-size:20px;margin:0}
@@ -182,15 +181,15 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
         @media print{.noprint{display:none}}
       </style></head><body>
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div><h1>DTE Payment Voucher</h1><div class="muted">AirConnect Engineering · HWT2304</div></div>
-        <div class="muted" style="text-align:right">Issued: ${today}<br/>Voucher: PV-${dteCode}-${Date.now().toString().slice(-6)}</div>
+        <div><h1>DTA Payment Voucher</h1><div class="muted">AirConnect Engineering · HWT2304</div></div>
+        <div class="muted" style="text-align:right">Issued: ${today}<br/>Voucher: PVA-${dtaCode}-${Date.now().toString().slice(-6)}</div>
       </div>
       <div class="box">
-        <div><b>Payee (DTE):</b> ${dteName} <span class="muted">(${dteCode})</span></div>
-        <div class="muted">${items.length} site(s) · rate = DT + Report (per DTE rate sheet)</div>
+        <div><b>Payee (DTA):</b> ${dtaName} <span class="muted">(${dtaCode})</span></div>
+        <div class="muted">${items.length} cluster(s) · rate = fixed per cluster (per DTA rate sheet)</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>Site</th><th>Type</th><th>Rate Category</th><th>DT Date</th><th>Approved</th><th style="text-align:right">Income (THB)</th><th>Status</th><th>Pay Ref</th></tr></thead>
+        <thead><tr><th>#</th><th>Cluster</th><th>Rate Category</th><th>Sites</th><th>Approved</th><th>Cycle</th><th style="text-align:right">Income (THB)</th><th>Status</th><th>Pay Ref</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
         <tfoot><tr><td colspan="6">TOTAL</td><td style="text-align:right">${fmtBaht(total)}</td><td colspan="2"></td></tr></tfoot>
       </table>
@@ -201,7 +200,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
       </div>
       <div class="sign">
         <div>Prepared by (Finance)</div>
-        <div>Received by (DTE)</div>
+        <div>Received by (DTA)</div>
       </div>
       <div class="noprint" style="margin-top:24px;text-align:center">
         <button onclick="window.print()" style="padding:10px 24px;font-weight:800;background:#2447d8;color:#fff;border:0;border-radius:8px;cursor:pointer">🖨 Print / Save as PDF</button>
@@ -215,16 +214,15 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-lg"
-                 style={{ background: `linear-gradient(135deg, ${GREEN}, ${ACE_BLUE})` }}>
+                 style={{ background: `linear-gradient(135deg, ${PURPLE}, ${ACE_BLUE})` }}>
               <Wallet size={20} />
             </div>
             <div>
-              <div className="text-sm font-black text-slate-950">DTE Payments Monitor</div>
+              <div className="text-sm font-black text-slate-950">DTA Payments Monitor</div>
               <div className="text-[.65rem] font-bold text-slate-400">Finance · who to pay & how much</div>
             </div>
           </div>
@@ -237,16 +235,15 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="flex flex-col gap-6">
-          {/* Heading */}
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
-              <Wallet size={14} /> Finance · DTE Payments
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-700">
+              <Wallet size={14} /> Finance · DTA Payments
             </div>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h1 className="mt-4 text-3xl font-black text-slate-950 sm:text-4xl">DTE Payments Monitor</h1>
+                <h1 className="mt-4 text-3xl font-black text-slate-950 sm:text-4xl">DTA Payments Monitor</h1>
                 <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-                  Track what needs to be paid, to whom, and how much. Mark sites as paid once disbursed.
+                  DTA earns a fixed per-cluster rate on PAC work. Track what needs paying, to whom, and mark paid once disbursed.
                 </p>
               </div>
               <button onClick={exportExcel}
@@ -257,12 +254,11 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
             </div>
           </div>
 
-          {/* Stats */}
           <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatCard label="To Pay (Unpaid)" value={fmtBaht(totals.unpaid)} helper={`${totals.sites || 0} sites total`} tone={AMBER} icon={Clock} />
+            <StatCard label="To Pay (Unpaid)" value={fmtBaht(totals.unpaid)} helper={`${totals.sites || 0} clusters total`} tone={AMBER} icon={Clock} />
             <StatCard label="Ready to Pay" value={fmtBaht(totals.payable)} helper="Approved + unpaid" tone={RED} icon={BadgeCheck} />
             <StatCard label="Paid" value={fmtBaht(totals.paid)} helper="Already disbursed" tone={GREEN} icon={CheckCircle2} />
-            <StatCard label="DTEs" value={totals.dtes || 0} helper="With records" tone={PURPLE} icon={Users} />
+            <StatCard label="DTAs" value={totals.dtas || 0} helper="With records" tone={PURPLE} icon={Users} />
           </section>
 
           {/* Pay cycles — Round 1 (1–15) / Round 2 (16–EOM), by approval date */}
@@ -281,7 +277,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                       <div className="flex items-center justify-between">
                         <button onClick={() => setCycleFilter(active ? '' : c.cycle)} className="text-left">
                           <div className="font-mono text-sm font-black text-slate-900">{c.cycle}</div>
-                          <div className="text-[.6rem] font-bold text-slate-400">pay {c.pay_date} · {c.sites} site(s)</div>
+                          <div className="text-[.6rem] font-bold text-slate-400">pay {c.pay_date} · {c.sites} cluster(s)</div>
                         </button>
                         <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[.58rem] font-black text-slate-500">{active ? 'FILTERED' : 'filter'}</span>
                       </div>
@@ -291,7 +287,7 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                           <div className="font-mono text-lg font-black" style={{ color: c.payable > 0 ? RED : '#94a3b8' }}>{fmtBaht(c.payable)}</div>
                         </div>
                         <button disabled={busy || c.payable <= 0} onClick={() => payWholeCycle(c.cycle, c.payable)}
-                          title={c.payable <= 0 ? 'Nothing ready to pay in this cycle' : `Pay all ready sites in ${c.cycle}`}
+                          title={c.payable <= 0 ? 'Nothing ready to pay in this cycle' : `Pay all ready clusters in ${c.cycle}`}
                           className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: GREEN }}>
                           {busy ? '…' : 'Pay cycle'}
                         </button>
@@ -307,36 +303,32 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
             </Card>
           )}
 
-          {/* Charts */}
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {/* Monthly stacked bars */}
             <Card className="p-5 lg:col-span-2">
               <h3 className="mb-4 inline-flex items-center gap-2 text-base font-black text-slate-950"><BarChart3 size={18} style={{ color: ACE_BLUE }} /> Monthly — Paid vs Unpaid</h3>
               <MonthlyBars monthly={monthly} />
             </Card>
-            {/* Paid vs Unpaid donut */}
             <Card className="p-5">
               <h3 className="mb-4 inline-flex items-center gap-2 text-base font-black text-slate-950"><PieChart size={18} style={{ color: GREEN }} /> Paid vs Unpaid</h3>
               <PaidDonut paid={totals.paid || 0} unpaid={totals.unpaid || 0} />
             </Card>
           </section>
 
-          {/* By-DTE summary */}
-          {byDte.length > 0 && (
+          {/* By-DTA summary */}
+          {byDta.length > 0 && (
             <Card className="overflow-hidden">
               <div className="border-b border-slate-100 px-6 py-4">
-                <h3 className="inline-flex items-center gap-2 text-base font-black text-slate-950"><Users size={18} style={{ color: PURPLE }} /> Summary by DTE</h3>
+                <h3 className="inline-flex items-center gap-2 text-base font-black text-slate-950"><Users size={18} style={{ color: PURPLE }} /> Summary by DTA</h3>
               </div>
-              {/* Horizontal bars per DTE */}
               <div className="px-6 py-4 border-b border-slate-100">
-                <DteBars byDte={byDte} />
+                <DtaBars byDta={byDta} />
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full" style={{ fontSize: '.82rem' }}>
                   <thead>
                     <tr className="bg-slate-50 text-left text-[.62rem] font-black uppercase text-slate-500">
-                      <th className="px-6 py-3">DTE</th>
-                      <th className="px-6 py-3 text-center">Sites</th>
+                      <th className="px-6 py-3">DTA</th>
+                      <th className="px-6 py-3 text-center">Clusters</th>
                       <th className="px-6 py-3 text-right">Total</th>
                       <th className="px-6 py-3 text-right">Paid</th>
                       <th className="px-6 py-3 text-right">Unpaid</th>
@@ -345,9 +337,9 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {byDte.map(b => (
-                      <tr key={b.dte_code} className="border-t border-slate-100 hover:bg-slate-50/60">
-                        <td className="px-6 py-3 font-black text-slate-900">{b.dte_name}<div className="text-[.6rem] font-mono font-bold text-slate-400">{b.dte_code}</div></td>
+                    {byDta.map(b => (
+                      <tr key={b.dta_code} className="border-t border-slate-100 hover:bg-slate-50/60">
+                        <td className="px-6 py-3 font-black text-slate-900">{b.dta_name}<div className="text-[.6rem] font-mono font-bold text-slate-400">{b.dta_code}</div></td>
                         <td className="px-6 py-3 text-center font-bold text-slate-700">{b.sites}</td>
                         <td className="px-6 py-3 text-right font-mono font-bold text-slate-700">{fmtBaht(b.total)}</td>
                         <td className="px-6 py-3 text-right font-mono font-bold text-emerald-700">{b.paid > 0 ? fmtBaht(b.paid) : '—'}</td>
@@ -355,11 +347,11 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                         <td className="px-6 py-3 text-right font-mono font-black" style={{ color: b.payable > 0 ? RED : '#cbd5e1' }}>{b.payable > 0 ? fmtBaht(b.payable) : '—'}</td>
                         <td className="px-6 py-3 text-right">
                           <div className="inline-flex gap-1.5">
-                            <button onClick={() => setDteFilter(b.dte_code === dteFilter ? '' : b.dte_code)}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-black ${dteFilter === b.dte_code ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
-                              {dteFilter === b.dte_code ? 'Filtered' : 'View'}
+                            <button onClick={() => setDtaFilter(b.dta_code === dtaFilter ? '' : b.dta_code)}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-black ${dtaFilter === b.dta_code ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+                              {dtaFilter === b.dta_code ? 'Filtered' : 'View'}
                             </button>
-                            <button onClick={() => printVoucher(b.dte_code)} title="PDF payment voucher"
+                            <button onClick={() => printVoucher(b.dta_code)} title="PDF payment voucher"
                               className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50">
                               <Printer size={13} /> Voucher
                             </button>
@@ -378,21 +370,19 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
               <h3 className="inline-flex items-center gap-2 text-base font-black text-slate-950"><Filter size={18} style={{ color: ACE_BLUE }} /> Payment Detail</h3>
               <div className="flex flex-wrap items-center gap-2">
-                {/* Status filter */}
                 <div className="inline-flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
                   {[['all', 'All'], ['unpaid', 'Unpaid'], ['paid', 'Paid']].map(([v, l]) => (
                     <button key={v} onClick={() => setStatusFilter(v)}
                       className={`rounded-md px-3 py-1 text-xs font-black ${statusFilter === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>{l}</button>
                   ))}
                 </div>
-                {/* Month filter */}
                 <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">
                   <option value="">All months</option>
                   {monthsAvailable.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
                 </select>
-                {dteFilter && (
-                  <button onClick={() => setDteFilter('')} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">DTE: {dteFilter} ✕</button>
+                {dtaFilter && (
+                  <button onClick={() => setDtaFilter('')} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">DTA: {dtaFilter} ✕</button>
                 )}
                 <button onClick={reload} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-50"><RefreshCw size={14} /> Refresh</button>
               </div>
@@ -407,70 +397,63 @@ export default function DtePaymentsPage({ authenticatedUser, onLogout }) {
                 <table className="w-full" style={{ fontSize: '.8rem' }}>
                   <thead>
                     <tr className="bg-slate-50 text-left text-[.6rem] font-black uppercase text-slate-500">
-                      <th className="px-4 py-3">Site</th>
-                      <th className="px-4 py-3">DTE</th>
-                      <th className="px-4 py-3">Type / Rate</th>
-                      <th className="px-4 py-3">DT Date</th>
-                      <th className="px-4 py-3">Approved</th>
+                      <th className="px-4 py-3">Cluster</th>
+                      <th className="px-4 py-3">DTA Owner</th>
+                      <th className="px-4 py-3">Rate Category</th>
+                      <th className="px-4 py-3">PAC Approved</th>
                       <th className="px-4 py-3">Cycle</th>
-                      <th className="px-4 py-3">Report</th>
                       <th className="px-4 py-3 text-right">Income</th>
                       <th className="px-4 py-3 text-center">Status</th>
                       <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map(r => {
-                      const isPac = r.work_type === 'PAC'
-                      const color = isPac ? PURPLE : ACE_BLUE
-                      return (
-                        <tr key={r.tracking_id} className={`border-t border-slate-100 hover:bg-slate-50/60 ${r.payable ? 'bg-red-50/30' : ''}`}>
-                          <td className="px-4 py-3 font-mono font-black" style={{ color }}>{r.site_code}</td>
-                          <td className="px-4 py-3 font-bold text-slate-700">{r.dte_name}<div className="text-[.58rem] font-mono text-slate-400">{r.dte_code}</div></td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[.6rem] font-black" style={{ background: `${color}14`, color }}>
-                              {isPac ? <Layers size={10} /> : <Wifi size={10} />} {r.work_type}
-                            </span>
-                            <div className="mt-1 text-[.58rem] font-bold text-slate-400">{r.category}{r.site_count > 1 ? ` ×${r.site_count}` : ''}</div>
-                            {r.needs_review && <div className="mt-0.5 text-[.56rem] font-black text-amber-600" title={r.review_reason || 'Rate is a best-guess default — verify before paying'}>⚠ verify rate</div>}
-                          </td>
-                          <td className="px-4 py-3 text-xs font-bold text-slate-500">{r.dt_done_date || '—'}</td>
-                          <td className="px-4 py-3">
-                            {r.approved_at
-                              ? <div><div className="text-xs font-bold text-emerald-700">{(r.approved_at||'').slice(0,10)}</div><div className="text-[.56rem] font-bold text-slate-400">{r.approved_by_name}</div></div>
-                              : <span className="text-xs font-bold text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            {r.cycle
-                              ? <div><div className="font-mono text-[.66rem] font-black text-slate-700">{r.cycle}</div><div className="text-[.56rem] font-bold text-slate-400">pay {r.pay_date}</div></div>
-                              : <span className="text-xs font-bold text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            {r.has_report ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><FileArchive size={12} /> v{r.report_version}</span> : <span className="text-xs font-bold text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="font-mono font-black text-slate-900">{fmtBaht(r.income)}</div>
-                            <div className="text-[.56rem] font-bold text-slate-400">DT {fmtBaht(r.income_dt)}{r.income_report > 0 ? ` + Rep ${fmtBaht(r.income_report)}` : ''}</div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {r.paid
-                              ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[.6rem] font-black text-emerald-700" title={r.dte_payment_ref ? `Ref ${r.dte_payment_ref}` : ''}><CheckCircle2 size={11} /> Paid</span>
-                              : r.payable
-                                ? <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[.6rem] font-black text-red-700"><BadgeCheck size={11} /> Ready</span>
-                                : <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[.6rem] font-black text-amber-700"><Clock size={11} /> Unpaid</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {r.paid
-                              ? <button disabled={busyId === r.tracking_id} onClick={() => unmarkPaid(r.tracking_id)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 hover:bg-slate-50">Unmark</button>
-                              : <button disabled={busyId === r.tracking_id || !r.payable} onClick={() => markPaid(r.tracking_id)} title={!r.payable ? 'Not ready: needs ACE approval (and report upload for SSV/Pre-DT)' : ''} className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: GREEN }}>{busyId === r.tracking_id ? '…' : 'Mark Paid'}</button>}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    {rows.map(r => (
+                      <tr key={r.rf_cluster_name} className={`border-t border-slate-100 hover:bg-slate-50/60 ${r.payable ? 'bg-red-50/30' : ''}`}>
+                        <td className="px-4 py-3 font-mono font-black" style={{ color: PURPLE }}>{r.rf_cluster_name}</td>
+                        <td className="px-4 py-3">
+                          {(r.dta_code || r.dta_name)
+                            ? <div className="font-bold text-slate-700">{r.dta_name}{r.dta_code && <div className="text-[.58rem] font-mono text-slate-400">{r.dta_code}</div>}</div>
+                            : <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[.58rem] font-black text-rose-600" title="Assign on the DTA monitor page">unassigned</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[.6rem] font-black" style={{ background: `${PURPLE}14`, color: PURPLE }}>
+                            <Layers size={10} /> {r.category}{r.site_count > 1 ? ` ×${r.site_count}` : ''}
+                          </span>
+                          {r.needs_review && <div className="mt-0.5 text-[.56rem] font-black text-amber-600" title={r.review_reason || 'Rate is a best-guess default — verify before paying'}>⚠ verify rate</div>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {r.approved_at
+                            ? <div><div className="text-xs font-bold text-emerald-700">{(r.approved_at||'').slice(0,10)}</div><div className="text-[.56rem] font-bold text-slate-400">phase {r.phase}</div></div>
+                            : <span className="text-xs font-bold text-slate-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {r.cycle
+                            ? <div><div className="font-mono text-[.66rem] font-black text-slate-700">{r.cycle}</div><div className="text-[.56rem] font-bold text-slate-400">pay {r.pay_date}</div></div>
+                            : <span className="text-xs font-bold text-slate-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="font-mono font-black text-slate-900">{fmtBaht(r.income)}</div>
+                          <div className="text-[.56rem] font-bold text-slate-400">{fmtBaht(r.rate)}{r.site_count > 1 ? ` ×${r.site_count}` : ''}</div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {r.paid
+                            ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[.6rem] font-black text-emerald-700" title={r.dta_payment_ref ? `Ref ${r.dta_payment_ref}` : ''}><CheckCircle2 size={11} /> Paid</span>
+                            : r.payable
+                              ? <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[.6rem] font-black text-red-700"><BadgeCheck size={11} /> Ready</span>
+                              : <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[.6rem] font-black text-amber-700"><Clock size={11} /> Unpaid</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {r.paid
+                            ? <button disabled={busyId === r.rf_cluster_name} onClick={() => unmarkPaid(r.rf_cluster_name)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 hover:bg-slate-50">Unmark</button>
+                            : <button disabled={busyId === r.rf_cluster_name || !r.payable} onClick={() => markPaid(r.rf_cluster_name)} title={!r.payable ? 'Not ready: needs PAC Approved + an assigned DTA' : ''} className="rounded-lg px-3 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: GREEN }}>{busyId === r.rf_cluster_name ? '…' : 'Mark Paid'}</button>}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-slate-200 bg-slate-50">
-                      <td className="px-4 py-3 font-black text-slate-900" colSpan={6}>Total ({rows.length} sites)</td>
+                      <td className="px-4 py-3 font-black text-slate-900" colSpan={5}>Total ({rows.length} clusters)</td>
                       <td className="px-4 py-3 text-right font-mono font-black text-slate-900">{fmtBaht(rows.reduce((a,r)=>a+r.income,0))}</td>
                       <td colSpan={2}></td>
                     </tr>
@@ -508,7 +491,7 @@ function MonthlyBars({ monthly }) {
                 )}
               </div>
               <div className="text-[.62rem] font-black text-slate-500">{monthLabel(m.month).split(' ')[0]}</div>
-              <div className="text-[.55rem] font-bold text-slate-400">{m.sites} sites</div>
+              <div className="text-[.55rem] font-bold text-slate-400">{m.sites} clusters</div>
             </div>
           )
         })}
@@ -544,18 +527,18 @@ function PaidDonut({ paid, unpaid }) {
   )
 }
 
-function DteBars({ byDte }) {
-  if (!byDte || byDte.length === 0) return null
-  const max = Math.max(1, ...byDte.map(b => b.total))
+function DtaBars({ byDta }) {
+  if (!byDta || byDta.length === 0) return null
+  const max = Math.max(1, ...byDta.map(b => b.total))
   return (
     <div className="space-y-3">
-      {byDte.map(b => {
+      {byDta.map(b => {
         const paidPct = (b.paid / max) * 100
         const unpaidPct = (b.unpaid / max) * 100
         return (
-          <div key={b.dte_code}>
+          <div key={b.dta_code}>
             <div className="mb-1 flex items-center justify-between text-xs font-bold">
-              <span className="text-slate-700">{b.dte_name}</span>
+              <span className="text-slate-700">{b.dta_name}</span>
               <span className="font-mono text-slate-500">{fmtBaht(b.total)}</span>
             </div>
             <div className="flex h-5 w-full overflow-hidden rounded-lg bg-slate-100">

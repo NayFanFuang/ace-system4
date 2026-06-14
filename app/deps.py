@@ -14,6 +14,8 @@ SUPER_ADMIN_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN"}
 HR_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "HR_ADMIN"}
 HR_READ_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "HR_ADMIN", "HR_VIEWER", "DIRECTOR"}
 PROJECT_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "PROJECT_ADMIN", "HR_ADMIN", "DIRECTOR", "PM"}
+FINANCE_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "PROJECT_ADMIN", "HR_ADMIN", "DIRECTOR", "ACCOUNTING"}
+FINANCE_OR_PROJECT_ROLES = PROJECT_ROLES | FINANCE_ROLES
 MONITOR_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "HR_ADMIN", "HR_VIEWER", "PROJECT_ADMIN", "DIRECTOR", "PM"}
 # Per-user allowlist for Clock Monitor endpoints (in addition to MONITOR_ROLES).
 # Use when one EMPLOYEE-role person needs targeted Clock Monitor access
@@ -142,6 +144,10 @@ async def require_hr_read_user(payload: dict = Depends(get_current_user)) -> dic
 
 async def require_project_user(payload: dict = Depends(get_current_user)) -> dict:
     return require_role(payload, PROJECT_ROLES)
+
+
+async def require_finance_or_project_user(payload: dict = Depends(get_current_user)) -> dict:
+    return require_role(payload, FINANCE_OR_PROJECT_ROLES)
 
 
 async def require_monitor_user(payload: dict = Depends(get_current_user)) -> dict:

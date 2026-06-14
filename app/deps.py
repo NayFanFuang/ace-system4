@@ -24,6 +24,9 @@ EMPLOYEE_OR_ADMIN_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "HR_ADMIN", "HR_VIEWER
 # PO Collection Tracking dashboard — read access for Finance/Accounting, Project, and Executives.
 # Accounting needs visibility into PO billing/collection state alongside Project + Directors.
 PO_TRACKING_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "ACCOUNTING", "PROJECT_ADMIN", "PM", "DIRECTOR", "HR_ADMIN"}
+# Write actions on the PO Collection dashboard (mark billed / mark DTE paid).
+# Finance-style action — Accounting + admins + Project Admin only (not viewers/PM).
+PO_FINANCE_ACTION_ROLES = {"SUPER_ADMIN", "SYSTEM_ADMIN", "ACCOUNTING", "PROJECT_ADMIN"}
 
 ROLE_SCOPES = {
     "SUPER_ADMIN": {"admin:roles", "audit:read", "auth:read", "auth:write", "clock:read", "clock:write", "employees:read", "employees:write", "project:read", "project:write", "monitor:read", "kpi:read"},
@@ -149,6 +152,10 @@ async def require_project_user(payload: dict = Depends(get_current_user)) -> dic
 
 async def require_po_tracking_user(payload: dict = Depends(get_current_user)) -> dict:
     return require_role(payload, PO_TRACKING_ROLES)
+
+
+async def require_po_finance_action_user(payload: dict = Depends(get_current_user)) -> dict:
+    return require_role(payload, PO_FINANCE_ACTION_ROLES)
 
 
 async def require_monitor_user(payload: dict = Depends(get_current_user)) -> dict:

@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps import ROLE_LABELS, ROLE_SCOPES, get_current_user, require_hr_read_user, require_hr_user, require_po_tracking_user, require_project_user, require_self_or_admin
+from app.deps import ROLE_LABELS, ROLE_SCOPES, get_current_user, require_hr_read_user, require_hr_user, require_po_finance_action_user, require_po_tracking_user, require_project_user, require_self_or_admin
 from app.models.auth_user import AuthUser
 from app.models.clock import ClockSite, ClockSession
 from app.models.employee import Employee, EmployeeRelocation, HWImportLog, ProjectAssignment, ProjectCatalog, ProjectPO, ProjectSite
@@ -2472,6 +2472,7 @@ async def project_po_collection_dashboard(
     by_owner: dict[str, dict] = {}
     by_vendor: dict[str, dict] = {}
     by_project: dict[str, dict] = {}
+    monthly: dict[str, dict] = {}      # "YYYY-MM" → {collected, dte_paid}
     rows_out: list[dict] = []
     aging_watch: list[dict] = []
 
@@ -2513,6 +2514,12 @@ async def project_po_collection_dashboard(
             counts["dte_paid"] += 1; summary["dte_paid_value"] += amt
         elif p_state == "UNPAID":
             counts["dte_unpaid"] += 1; summary["dte_unpaid_value"] += amt
+
+        # Monthly trend — attribute amount to the month each leg actually completed
+        if b_state == "BILLED" and row.hw_billed_at:
+            monthly.setdefault(row.hw_billed_at.strftime("%Y-%m"), {"collected": 0.0, "dte_paid": 0.0})["collected"] += amt
+        if p_state == "PAID" and row.dte_paid_at:
+            monthly.setdefault(row.dte_paid_at.strftime("%Y-%m"), {"collected": 0.0, "dte_paid": 0.0})["dte_paid"] += amt
 
         _bump(by_status, (row.workflow_status or "NEW").upper(), amt)
         _bump(by_phase, phase, amt)
@@ -2574,6 +2581,10 @@ async def project_po_collection_dashboard(
         "by_owner": _flatten(by_owner),
         "by_vendor": _flatten(by_vendor),
         "by_project": _flatten(by_project),
+        "monthly": [
+            {"month": k, "collected": round(v["collected"], 2), "dte_paid": round(v["dte_paid"], 2)}
+            for k, v in sorted(monthly.items())
+        ],
         "aging_watch": aging_watch[:60],
         "data": rows_out,
         "total": len(rows_out),
@@ -3332,6 +3343,77 @@ async def patch_po_billing(
     await db.commit()
     await db.refresh(row)
     return po_to_dict(row)
+
+
+class PoCollectionActionIn(BaseModel):
+    action: str                       # bill_ac1|bill_ac2|unbill_ac1|unbill_ac2|mark_dte_paid|unmark_dte_paid
+    invoice_no: str | None = None     # for bill_ac1 / bill_ac2
+    payment_ref: str | None = None    # for mark_dte_paid
+
+
+@router.post("/project-pos/{po_id}/collection-action")
+async def po_collection_action(
+    po_id: int,
+    body: PoCollectionActionIn,
+    request: Request,
+    payload: dict = Depends(require_po_finance_action_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quick finance actions from the Collection Tracking dashboard.
+
+    Updates only the close-out money legs (HW billing / DTE payment) and the
+    derived hw_billed_at sync — it intentionally does NOT rewind the workflow
+    state machine, so it is safe to call from a monitoring view. Every action
+    is audit-logged.
+    """
+    action = (body.action or "").lower().strip()
+    row = (await db.execute(select(ProjectPO).where(ProjectPO.id == po_id))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "PO not found")
+
+    actor = payload.get("employee_code") or payload.get("sub")
+    now = datetime.now(timezone.utc)
+
+    if action in ("bill_ac1", "bill_ac2", "unbill_ac1", "unbill_ac2"):
+        m = "ac1" if action.endswith("ac1") else "ac2"
+        billed = action.startswith("bill_")
+        setattr(row, f"{m}_billed_at", now if billed else None)
+        if billed and body.invoice_no is not None:
+            setattr(row, f"{m}_invoice_no", body.invoice_no.strip() or None)
+        # Keep legacy hw_billed_at in sync: billed when all applicable AC done.
+        has_ac2 = "/" in (row.payment_terms or "")
+        ac1_ok = row.ac1_billed_at is not None
+        ac2_ok = (row.ac2_billed_at is not None) if has_ac2 else True
+        if ac1_ok and ac2_ok:
+            if row.hw_billed_at is None:
+                row.hw_billed_at = now
+                row.hw_billed_by = actor
+        else:
+            row.hw_billed_at = None
+            row.hw_billed_by = None
+    elif action == "mark_dte_paid":
+        row.dte_paid_at = now
+        row.dte_paid_by = actor
+    elif action == "unmark_dte_paid":
+        row.dte_paid_at = None
+        row.dte_paid_by = None
+    else:
+        raise HTTPException(400, f"Unknown action '{action}'")
+
+    row.last_action_at = now
+    await write_audit_log(
+        db, action=f"po_collection_{action}", entity_type="project_po", entity_id=str(row.id),
+        payload=payload,
+        new_value={"po_number": row.po_number, "po_line": row.po_line,
+                   "invoice_no": body.invoice_no, "payment_ref": body.payment_ref},
+        request=request, source="PO Collection Dashboard",
+    )
+    await db.commit()
+    await db.refresh(row)
+    rec = po_to_dict(row)
+    rec["billing_state"] = _po_billing_state(row)
+    rec["dte_pay_state"] = _po_dte_pay_state(row)
+    return rec
 
 
 async def ensure_clockapp_sync(db: AsyncSession, row: ProjectPO,

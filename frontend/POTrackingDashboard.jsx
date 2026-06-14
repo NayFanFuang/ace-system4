@@ -146,6 +146,35 @@ function PipelineFunnel({ byPhase }) {
   )
 }
 
+// Monthly trend — collected (bill HW) vs DTE paid, per month
+function MonthlyTrend({ monthly }) {
+  if (!monthly || monthly.length === 0) {
+    return <div className="py-8 text-center text-sm font-bold text-slate-400">ยังไม่มีข้อมูลการเก็บเงิน/จ่ายรายเดือน</div>
+  }
+  const max = Math.max(1, ...monthly.map(m => Math.max(m.collected, m.dte_paid)))
+  const months = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+  const mLabel = ym => { const [y, m] = (ym || '').split('-'); return `${months[parseInt(m, 10)] || m} ${(y || '').slice(2)}` }
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-4 text-xs font-black">
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: GREEN }} /> เก็บเงินได้</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: CYAN }} /> จ่าย DTE</span>
+      </div>
+      <div className="flex items-end gap-3 overflow-x-auto pb-2" style={{ minHeight: 160 }}>
+        {monthly.map(m => (
+          <div key={m.month} className="flex shrink-0 flex-col items-center gap-1" style={{ width: 54 }}>
+            <div className="flex h-32 items-end gap-1">
+              <div className="w-5 rounded-t" style={{ height: `${(m.collected / max) * 100}%`, background: GREEN }} title={`เก็บได้ ${fmtBaht(m.collected)}`} />
+              <div className="w-5 rounded-t" style={{ height: `${(m.dte_paid / max) * 100}%`, background: CYAN }} title={`จ่าย DTE ${fmtBaht(m.dte_paid)}`} />
+            </div>
+            <div className="text-[.62rem] font-black text-slate-500">{mLabel(m.month)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // Breakdown table (owner / vendor / project)
 function BreakdownTable({ title, icon: Icon, tone, rows, keyLabel }) {
   if (!rows || rows.length === 0) return null
@@ -186,6 +215,9 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('overview')  // overview | detail | aging
   const [search, setSearch] = useState('')
+  const [busyId, setBusyId] = useState(null)
+
+  const canAct = ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'ACCOUNTING', 'PROJECT_ADMIN'].includes(authenticatedUser?.role)
 
   // Server-side filters
   const [aceProject, setAceProject] = useState('')
@@ -231,6 +263,27 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
       (r.hw_invoice_no || '').toLowerCase().includes(q)
     )
   }, [d.data, search])
+
+  async function doAction(row, action) {
+    let invoice_no = null, payment_ref = null
+    if (action === 'bill_ac1' || action === 'bill_ac2') {
+      invoice_no = window.prompt(`เลขที่ Invoice (HW) สำหรับ ${action === 'bill_ac1' ? 'AC1' : 'AC2'}:`, '')
+      if (invoice_no === null) return
+    } else if (action === 'mark_dte_paid') {
+      payment_ref = window.prompt('อ้างอิงการจ่าย DTE (ไม่บังคับ):', '')
+      if (payment_ref === null) return
+    } else if (action.startsWith('unbill') || action === 'unmark_dte_paid') {
+      if (!window.confirm('ยืนยันยกเลิกรายการนี้?')) return
+    }
+    setBusyId(row.id)
+    try {
+      const res = await apiFetch(`/api/project-pos/${row.id}/collection-action`, {
+        method: 'POST', body: JSON.stringify({ action, invoice_no, payment_ref }),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.detail || 'ทำรายการไม่สำเร็จ'); return }
+      await reload()
+    } finally { setBusyId(null) }
+  }
 
   function doExport() {
     const rows = (tab === 'aging' ? d.aging_watch : visibleRows)
@@ -379,6 +432,10 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                   <PipelineFunnel byPhase={d.by_phase} />
                 </Card>
               </section>
+              <Card className="p-5">
+                <h3 className="mb-4 inline-flex items-center gap-2 text-base font-black text-slate-950"><TrendingUp size={18} style={{ color: GREEN }} /> แนวโน้มรายเดือน — เก็บเงินได้ vs จ่าย DTE</h3>
+                <MonthlyTrend monthly={d.monthly} />
+              </Card>
               <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <BreakdownTable title="ค้างอยู่ที่ใคร" icon={Users} tone={PURPLE} rows={d.by_owner} keyLabel="เจ้าของงาน" />
                 <BreakdownTable title="แยกตาม Vendor" icon={Building2} tone={CYAN} rows={d.by_vendor} keyLabel="Vendor" />
@@ -403,6 +460,7 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                       <th className="px-4 py-3 text-center">AC1/AC2</th>
                       <th className="px-4 py-3">จ่าย DTE</th>
                       <th className="px-4 py-3 text-center">ค้าง(วัน)</th>
+                      {canAct && <th className="px-4 py-3 text-right">ทำรายการ</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -431,10 +489,15 @@ export default function POTrackingDashboard({ authenticatedUser, onLogout }) {
                         <td className="px-4 py-3 text-center">
                           <span className={`font-black ${r.aging_days > 14 ? 'text-red-600' : r.aging_days > 7 ? 'text-amber-600' : 'text-slate-400'}`}>{r.aging_days}</span>
                         </td>
+                        {canAct && (
+                          <td className="px-4 py-3">
+                            <RowActions row={r} busy={busyId === r.id} onAction={doAction} />
+                          </td>
+                        )}
                       </tr>
                     ))}
                     {visibleRows.length === 0 && (
-                      <tr><td colSpan={10} className="px-4 py-12 text-center text-sm font-bold text-slate-400">ไม่พบ PO ตามตัวกรอง</td></tr>
+                      <tr><td colSpan={canAct ? 11 : 10} className="px-4 py-12 text-center text-sm font-bold text-slate-400">ไม่พบ PO ตามตัวกรอง</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -505,6 +568,23 @@ function Select({ value, onChange, options, placeholder }) {
       <option value="">{placeholder}</option>
       {options.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
     </select>
+  )
+}
+function RowActions({ row, busy, onAction }) {
+  const hasAc2 = (row.payment_terms || '').includes('/')
+  const btn = 'rounded-lg px-2 py-1 text-[.66rem] font-black transition disabled:opacity-40'
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      {!row.ac1_billed_at
+        ? <button disabled={busy} onClick={() => onAction(row, 'bill_ac1')} className={`${btn} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>บิล AC1</button>
+        : <button disabled={busy} onClick={() => onAction(row, 'unbill_ac1')} className={`${btn} bg-slate-100 text-slate-500 hover:bg-slate-200`}>↩ AC1</button>}
+      {hasAc2 && (!row.ac2_billed_at
+        ? <button disabled={busy} onClick={() => onAction(row, 'bill_ac2')} className={`${btn} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>บิล AC2</button>
+        : <button disabled={busy} onClick={() => onAction(row, 'unbill_ac2')} className={`${btn} bg-slate-100 text-slate-500 hover:bg-slate-200`}>↩ AC2</button>)}
+      {row.dte_pay_state !== 'N/A' && (row.dte_pay_state !== 'PAID'
+        ? <button disabled={busy} onClick={() => onAction(row, 'mark_dte_paid')} className={`${btn} bg-cyan-50 text-cyan-700 hover:bg-cyan-100`}>จ่าย DTE</button>
+        : <button disabled={busy} onClick={() => onAction(row, 'unmark_dte_paid')} className={`${btn} bg-slate-100 text-slate-500 hover:bg-slate-200`}>↩ DTE</button>)}
+    </div>
   )
 }
 function Dot({ on, label }) {

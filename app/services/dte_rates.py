@@ -132,3 +132,43 @@ def compute_income(work_type: str | None, item_dis: str | None,
     return {"dt": 0, "report": 0, "total": 0, "unit_total": 0, "category": "—",
             "site_count": 1, "operator": op, "needs_review": False}
 
+
+# ── DTA (drive-test analyst) income ──────────────────────────────────────────
+# DTA is paid a single fixed rate per cluster/site on PAC (Cluster/SSOA) work
+# only — they run the cluster drive-test + log-file check. SSV/Pre-DT is DTE
+# work, so DTA earns 0 there. Rate is operator-aware (TRUE vs AIS), per site,
+# multiplied by the cluster's child-site count (mirrors DTE PAC).
+#     Cluster (TRUE) 1,100   SSOA (TRUE) 1,700
+#     Cluster (AIS)    600   SSOA (AIS)    800
+DTA_CLUSTER_TRUE = 1100
+DTA_SSOA_TRUE    = 1700
+DTA_CLUSTER_AIS  = 600
+DTA_SSOA_AIS     = 800
+
+
+def compute_dta_income(work_type: str | None, item_dis: str | None,
+                       site_count: int = 1, operator: str | None = None) -> dict:
+    """Return {rate, total, category, site_count, operator, needs_review} for a
+    tracking row's DTA earnings. Non-PAC (SSV/Pre-DT) → 0 (not DTA work)."""
+    text = (item_dis or "").lower()
+    wt = (work_type or "").upper()
+    op = detect_operator(item_dis, operator)
+    n = max(1, site_count)
+    if "ssoa" in text:
+        rate = DTA_SSOA_AIS if op == "AIS" else DTA_SSOA_TRUE
+        return {"rate": rate, "total": rate * n, "category": f"SSOA ({op})",
+                "site_count": n, "operator": op, "needs_review": False}
+    if "cluster" in text:
+        rate = DTA_CLUSTER_AIS if op == "AIS" else DTA_CLUSTER_TRUE
+        return {"rate": rate, "total": rate * n, "category": f"Cluster ({op})",
+                "site_count": n, "operator": op, "needs_review": False}
+    if wt == "PAC":
+        # PAC without a Cluster/SSOA keyword → assume Cluster, flag for review
+        rate = DTA_CLUSTER_AIS if op == "AIS" else DTA_CLUSTER_TRUE
+        return {"rate": rate, "total": rate * n, "category": f"Cluster ({op})",
+                "site_count": n, "operator": op, "needs_review": True,
+                "review_reason": "PAC without Cluster/SSOA keyword — assumed Cluster"}
+    # SSV / Pre-DT / unknown → DTA earns nothing on this row
+    return {"rate": 0, "total": 0, "category": "—", "site_count": 1,
+            "operator": op, "needs_review": False}
+
